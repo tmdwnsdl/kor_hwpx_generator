@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# 가상환경
+venv/
+.venv/
+env/
+
+# 환경변수
+.env
+.env.*
+
+# 생성 파일
+storage/hwpx/
+storage/json/
+
+# 렌더러 패키지 (자동 생성)
+renderer/
+
+# Claude
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db

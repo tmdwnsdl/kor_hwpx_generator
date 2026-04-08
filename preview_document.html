@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>문서 미리보기</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Malgun Gothic", "맑은 고딕", Arial, sans-serif;
+      background: #f5f7fb;
+      color: #222;
+    }
+
+    .wrap {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .title {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 20px;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 460px 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+
+    .panel {
+      background: #fff;
+      border: 1px solid #dfe3ea;
+      border-radius: 14px;
+      padding: 20px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.05);
+    }
+
+    .panel h2 {
+      margin: 0 0 16px;
+      font-size: 20px;
+    }
+
+    .field {
+      margin-bottom: 14px;
+    }
+
+    .field label {
+      display: block;
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .field input,
+    .field textarea {
+      width: 100%;
+      border: 1px solid #cfd6e0;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 14px;
+      outline: none;
+      background: #fff;
+    }
+
+    .field input:focus,
+    .field textarea:focus {
+      border-color: #4f7cff;
+      box-shadow: 0 0 0 3px rgba(79,124,255,0.12);
+    }
+
+    .field textarea {
+      min-height: 120px;
+      resize: vertical;
+      line-height: 1.6;
+    }
+
+    .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    button {
+      border: none;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .btn-primary {
+      background: #4f7cff;
+      color: #fff;
+    }
+
+    .btn-secondary {
+      background: #eef2f8;
+      color: #2a3850;
+    }
+
+    .btn-danger {
+      background: #ffe9e9;
+      color: #b42318;
+    }
+
+    .preview-doc {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 32px;
+      min-height: 700px;
+    }
+
+    .doc-title {
+      font-size: 28px;
+      font-weight: 700;
+      text-align: center;
+      margin: 0 0 32px;
+      padding-bottom: 14px;
+      border-bottom: 2px solid #d7dde8;
+    }
+
+    .section {
+      margin-bottom: 28px;
+    }
+
+    .section h3 {
+      margin: 0 0 12px;
+      font-size: 22px;
+      font-weight: 700;
+    }
+
+    .section p {
+      margin: 0;
+      line-height: 1.8;
+      font-size: 15px;
+      white-space: pre-wrap;
+    }
+
+    .json-box {
+      margin-top: 20px;
+      background: #0f172a;
+      color: #dbeafe;
+      border-radius: 12px;
+      padding: 16px;
+      font-family: Consolas, Monaco, monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      overflow: auto;
+      max-height: 280px;
+    }
+
+    @media (max-width: 1080px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="title">문서 미리보기 테스트</div>
+
+    <div class="layout">
+      <div class="panel">
+        <h2>입력</h2>
+
+        <div class="field">
+          <label for="titleInput">제목</label>
+          <input id="titleInput" type="text" value="사규 개선 공모 계획 보고서" />
+        </div>
+
+        <div class="field">
+          <label for="backgroundInput">추진배경</label>
+          <textarea id="backgroundInput">관련 제도 정비 필요성이 증가하고 있으며, 업무 효율화를 위한 개선 검토가 필요하다.</textarea>
+        </div>
+
+        <div class="field">
+          <label for="contentInput">주요내용</label>
+          <textarea id="contentInput">공모 개요와 심사 기준, 포상 계획을 포함하여 운영 방안을 수립한다.</textarea>
+        </div>
+
+        <div class="field">
+          <label for="effectInput">기대효과</label>
+          <textarea id="effectInput">직원 참여 기반의 개선 과제를 발굴하고 조직 전반의 청렴도 향상에 기여할 수 있다.</textarea>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn-primary" onclick="updatePreview()">미리보기 반영</button>
+          <button class="btn-secondary" onclick="downloadJson()">JSON 다운로드</button>
+          <button class="btn-secondary" onclick="copyJson()">JSON 복사</button>
+          <button class="btn-danger" onclick="resetForm()">초기화</button>
+        </div>
+
+        <div class="json-box" id="jsonPreview"></div>
+      </div>
+
+      <div class="panel">
+        <h2>미리보기</h2>
+        <div class="preview-doc" id="preview"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 수정된 부분: 실제 MCP 문서 구조와 최대한 비슷한 형태로 JSON을 유지
+    function buildDocumentData() {
+      return {
+        doc_type: "report",
+        title: document.getElementById("titleInput").value.trim(),
+        sections: [
+          {
+            key: "background",
+            heading: "1. 추진배경",
+            blocks: [
+              {
+                type: "paragraph",
+                text: document.getElementById("backgroundInput").value.trim()
+              }
+            ]
+          },
+          {
+            key: "content",
+            heading: "2. 주요내용",
+            blocks: [
+              {
+                type: "paragraph",
+                text: document.getElementById("contentInput").value.trim()
+              }
+            ]
+          },
+          {
+            key: "expected_effect",
+            heading: "3. 기대효과",
+            blocks: [
+              {
+                type: "paragraph",
+                text: document.getElementById("effectInput").value.trim()
+              }
+            ]
+          }
+        ]
+      };
+    }
+
+    // 수정된 부분: JSON 기반으로 미리보기 HTML을 생성
+    function renderPreview(doc) {
+      let html = `<div class="doc-title">${escapeHtml(doc.title || "제목 없음")}</div>`;
+
+      for (const section of doc.sections) {
+        html += `<div class="section">`;
+        html += `<h3>${escapeHtml(section.heading)}</h3>`;
+
+        for (const block of section.blocks) {
+          if (block.type === "paragraph") {
+            html += `<p>${escapeHtml(block.text || "")}</p>`;
+          }
+        }
+
+        html += `</div>`;
+      }
+
+      document.getElementById("preview").innerHTML = html;
+    }
+
+    // 수정된 부분: 현재 상태의 JSON을 화면 하단에 같이 보여줌
+    function renderJson(doc) {
+      document.getElementById("jsonPreview").textContent =
+        JSON.stringify(doc, null, 2);
+    }
+
+    // 수정된 부분: 버튼 클릭 시 입력값 -> JSON -> 미리보기 동기화
+    function updatePreview() {
+      const doc = buildDocumentData();
+      renderPreview(doc);
+      renderJson(doc);
+    }
+
+    // 수정된 부분: 로컬 테스트용으로 JSON 다운로드 기능 추가
+    function downloadJson() {
+      const doc = buildDocumentData();
+      const blob = new Blob(
+        [JSON.stringify(doc, null, 2)],
+        { type: "application/json;charset=utf-8" }
+      );
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "preview_document.json";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // 수정된 부분: JSON 복사 기능 추가
+    async function copyJson() {
+      const doc = buildDocumentData();
+      await navigator.clipboard.writeText(JSON.stringify(doc, null, 2));
+      alert("JSON 복사 완료");
+    }
+
+    // 수정된 부분: 초기 입력값으로 되돌리는 함수 추가
+    function resetForm() {
+      document.getElementById("titleInput").value = "사규 개선 공모 계획 보고서";
+      document.getElementById("backgroundInput").value = "관련 제도 정비 필요성이 증가하고 있으며, 업무 효율화를 위한 개선 검토가 필요하다.";
+      document.getElementById("contentInput").value = "공모 개요와 심사 기준, 포상 계획을 포함하여 운영 방안을 수립한다.";
+      document.getElementById("effectInput").value = "직원 참여 기반의 개선 과제를 발굴하고 조직 전반의 청렴도 향상에 기여할 수 있다.";
+      updatePreview();
+    }
+
+    // 수정된 부분: HTML 렌더링 시 특수문자 안전 처리
+    function escapeHtml(str) {
+      return String(str)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    // 수정된 부분: 페이지 진입 시 바로 기본 미리보기 표시
+    updatePreview();
+  </script>
+</body>
+</html>
