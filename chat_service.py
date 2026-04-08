@@ -46,9 +46,9 @@ class ReportDocument:
 
 
 DEFAULT_SECTIONS = [
-    ("background", "1. 추진배경"),
-    ("content", "2. 주요내용"),
-    ("expected_effect", "3. 기대효과"),
+    {"key": "background", "heading": "추진배경"},
+    {"key": "content", "heading": "주요내용"},
+    {"key": "expected_effect", "heading": "기대효과"},
 ]
 
 
@@ -106,9 +106,14 @@ class DocumentStore:
         return self._docs[document_id]
 
     def create_report(
-        self, title: str, author: str = "", department: str = ""
+        self,
+        title: str,
+        author: str = "",
+        department: str = "",
+        sections: Optional[List[Dict[str, str]]] = None,
     ) -> ReportDocument:
         document_id = f"doc_{uuid4().hex[:8]}"
+        section_defs = sections if sections else DEFAULT_SECTIONS
         doc = ReportDocument(
             document_id=document_id,
             title=title,
@@ -118,8 +123,8 @@ class DocumentStore:
                 "date": datetime.now().strftime("%Y-%m-%d"),
             },
             sections=[
-                Section(key=key, heading=heading)
-                for key, heading in DEFAULT_SECTIONS
+                Section(key=s["key"], heading=s["heading"])
+                for s in section_defs
             ],
         )
         self.save(doc)
@@ -133,8 +138,9 @@ store = DocumentStore()
 def _doc_to_blocks_json(doc: ReportDocument) -> dict:
     """DocumentStore 형식 → hwpx_renderer가 요구하는 blocks 형식 변환"""
     blocks: List[dict] = []
-    for section in doc.sections:
-        blocks.append({"type": "heading", "text": section.heading, "level": 2})
+    for i, section in enumerate(doc.sections, 1):
+        heading_text = f"{i}. {section.heading}"
+        blocks.append({"type": "heading", "text": heading_text, "level": 2})
         for block in section.blocks:
             btype = block.get("type")
             if btype == "paragraph":
@@ -156,13 +162,33 @@ TOOLS: List[dict] = [
         "type": "function",
         "function": {
             "name": "create_report_draft",
-            "description": "새 보고서 초안을 생성합니다. 보고서 작성을 시작할 때 가장 먼저 호출하세요.",
+            "description": (
+                "새 보고서 초안을 생성합니다. 보고서 작성을 시작할 때 가장 먼저 호출하세요. "
+                "sections에 보고서 유형에 맞는 섹션 구성을 지정하세요. "
+                "각 섹션은 key(영문 식별자)와 heading(한글 제목)으로 구성됩니다."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "title": {"type": "string", "description": "보고서 제목"},
                     "author": {"type": "string", "description": "작성자 이름 (선택)"},
                     "department": {"type": "string", "description": "부서명 (선택)"},
+                    "sections": {
+                        "type": "array",
+                        "description": (
+                            "섹션 목록. 보고서 유형에 맞게 구성. "
+                            "예) 기획보고서: [{key:'background',heading:'추진배경'},{key:'issue',heading:'현황 및 문제점'},{key:'plan',heading:'추진방안'},{key:'schedule',heading:'향후계획'}] "
+                            "예) 회의계획서: [{key:'overview',heading:'회의개요'},{key:'agenda',heading:'안건'},{key:'schedule',heading:'시간계획'}]"
+                        ),
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "key": {"type": "string"},
+                                "heading": {"type": "string"},
+                            },
+                            "required": ["key", "heading"],
+                        },
+                    },
                 },
                 "required": ["title"],
             },
@@ -182,12 +208,7 @@ TOOLS: List[dict] = [
                     "document_id": {"type": "string"},
                     "section_key": {
                         "type": "string",
-                        "enum": ["background", "content", "expected_effect"],
-                        "description": (
-                            "background: 추진배경  |  "
-                            "content: 주요내용  |  "
-                            "expected_effect: 기대효과"
-                        ),
+                        "description": "create_report_draft에서 지정한 섹션 key값",
                     },
                     "text": {"type": "string", "description": "섹션 본문 내용"},
                     "append": {
@@ -210,7 +231,7 @@ TOOLS: List[dict] = [
                     "document_id": {"type": "string"},
                     "section_key": {
                         "type": "string",
-                        "enum": ["background", "content", "expected_effect"],
+                        "description": "create_report_draft에서 지정한 섹션 key값",
                     },
                     "headers": {
                         "type": "array",
@@ -255,6 +276,28 @@ TOOLS: List[dict] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_writing_guide",
+            "description": (
+                "K-water 보고서 작성 가이드를 조회합니다. "
+                "보고서 작성 전에 반드시 호출하여 작성 원칙과 유형별 방법을 참고하세요. "
+                "section: 'general'(작성 기본원칙), '기획보고서', '현황보고서', '회의계획서', '행사계획서'"
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "section": {
+                        "type": "string",
+                        "enum": ["general", "기획보고서", "현황보고서", "회의계획서", "행사계획서"],
+                        "description": "조회할 가이드 섹션",
+                    },
+                },
+                "required": ["section"],
+            },
+        },
+    },
 ]
 
 
@@ -266,6 +309,7 @@ def _execute_tool(name: str, inputs: dict) -> dict:
                 title=inputs["title"],
                 author=inputs.get("author", ""),
                 department=inputs.get("department", ""),
+                sections=inputs.get("sections"),
             )
             return store.to_dict(doc)
 
@@ -327,6 +371,18 @@ def _execute_tool(name: str, inputs: dict) -> dict:
                 "download_url": f"/download-hwpx/{p.name}",
             }
 
+        elif name == "get_writing_guide":
+            guide_path = BASE_DIR / "guides" / "kwater_writing_guide.json"
+            with open(guide_path, encoding="utf-8") as f:
+                guide = json.load(f)
+            section = inputs["section"]
+            if section == "general":
+                return {"section": "general", "content": guide["general_principles"]}
+            elif section in guide["report_types"]:
+                return {"section": section, "content": guide["report_types"][section]}
+            else:
+                return {"error": f"Unknown section: {section}"}
+
         else:
             return {"error": f"Unknown tool: {name}"}
 
@@ -338,20 +394,31 @@ def _execute_tool(name: str, inputs: dict) -> dict:
 SYSTEM_PROMPT = """당신은 한국 공공기관 및 기업의 공식 보고서 작성을 전문으로 돕는 어시스턴트입니다.
 사용자와 대화하며 HWPX 형식의 보고서를 함께 완성합니다.
 
-보고서 구조 (3개 섹션 고정):
-  - 1. 추진배경 (section_key: background)  — 사업 배경, 현황, 필요성
-  - 2. 주요내용 (section_key: content)     — 구체적 추진 내용, 계획, 방법론
-  - 3. 기대효과 (section_key: expected_effect) — 예상 성과, 효과, 파급력
+보고서 섹션 구성:
+  - 섹션 수와 이름은 보고서 유형에 따라 자유롭게 구성합니다 (최대 7개 권장)
+  - create_report_draft 호출 시 sections 파라미터로 섹션 목록을 직접 정의하세요
+  - 각 섹션은 key(영문 식별자)와 heading(한글 제목)으로 구성됩니다
+  - 예) 기획보고서: 추진배경→현황및문제점→추진방안→향후계획→건의및제안
+  - 예) 회의계획서: 회의개요→안건→시간계획
+  - 예) 행사계획서: 행사개요→시간계획→사전준비계획→행정사항
 
 작업 흐름:
-  1. 사용자 요청을 파악 → create_report_draft 호출 (문서 초안 생성)
-  2. 각 섹션 내용을 사용자와 협의하며 set_section_text로 입력 (append=false로 교체)
-  3. 표가 필요하면 add_simple_table 호출
-  4. 내용이 모두 완성되면 render_hwpx 호출 → HWPX 파일 생성
-  5. 생성 완료 후 다운로드 링크 안내
+  1. 사용자 요청 파악 → get_writing_guide 호출로 보고서 유형별 작성 가이드 참조
+  2. 가이드 기반으로 적절한 섹션 구성 결정
+  3. create_report_draft 호출 시 sections 파라미터에 섹션 목록 전달
+  4. 각 섹션 내용을 set_section_text로 입력 (section_key는 step 3에서 정의한 key 사용)
+  5. 표가 필요하면 add_simple_table 호출
+  6. 내용 완성 후 render_hwpx 호출 → HWPX 파일 생성
+  7. 생성 완료 후 다운로드 링크 안내
+
+가이드 활용 원칙:
+  - 보고서 유형에 따라 get_writing_guide의 section 선택
+    ('기획보고서', '현황보고서', '회의계획서', '행사계획서', 'general')
+  - 유형이 불분명하면 'general'로 기본원칙을 먼저 조회
+  - 가이드의 작성 순서와 항목 구성을 섹션 설계에 반영
 
 글쓰기 원칙:
-  - 공식적이고 명확한 문체 사용
+  - 공식적이고 명확한 문체 사용 (서술형 개조식: ~하였음 형태)
   - 수치·사실 기반의 구체적 서술
   - 사용자가 제공한 정보를 최대한 반영
   - 부족한 정보는 사용자에게 질문하여 보완"""
