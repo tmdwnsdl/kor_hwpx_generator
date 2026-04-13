@@ -83,18 +83,21 @@ def render_html(doc_json: dict) -> str:
 
     /* 표 */
     .doc-table {
-      width: 100%;
+      width: auto;
+      min-width: 50%;
       border-collapse: collapse;
       margin: 8px 0 14px;
       font-size: 14px;
       font-family: 'NanumMyeongjo', '휴먼명조', 'Batang', serif;
+      table-layout: auto;
     }
     .doc-table th, .doc-table td {
       border: 1px solid #444;
-      padding: 6px 10px;
+      padding: 6px 14px;
       vertical-align: middle;
       text-align: center;
       line-height: 1.5;
+      white-space: nowrap;
     }
     .doc-table th {
       background: #f0f0f0;

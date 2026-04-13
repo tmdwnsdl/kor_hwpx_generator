@@ -30,17 +30,47 @@ OUTPUT_DIR = BASE_DIR / "storage" / "hwpx"
 
 _TABLE_WIDTH = 47620
 _CELL_HEIGHT = 1800
+_COL_MIN_WIDTH = 4000   # 최소 열 너비
+
+
+def _calc_col_widths(headers: list, rows: list) -> list[int]:
+    """각 열의 최대 글자 수 기준으로 열 너비를 비례 배분"""
+    col_count = len(headers)
+    if col_count == 0:
+        return []
+
+    def char_weight(s: str) -> int:
+        # 한글/한자 등 전각 문자는 2배 가중치
+        return sum(2 if ord(c) > 0x3000 else 1 for c in str(s))
+
+    max_weights = []
+    for ci in range(col_count):
+        weights = [char_weight(headers[ci])]
+        for row in rows:
+            if ci < len(row):
+                weights.append(char_weight(str(row[ci])))
+        max_weights.append(max(weights) + 2)  # 여백 여유
+
+    total_weight = sum(max_weights)
+    widths = [
+        max(_COL_MIN_WIDTH, int(_TABLE_WIDTH * w / total_weight))
+        for w in max_weights
+    ]
+
+    # 마지막 열을 조정해서 총 너비를 맞춤
+    diff = _TABLE_WIDTH - sum(widths)
+    widths[-1] = max(_COL_MIN_WIDTH, widths[-1] + diff)
+    return widths
 
 
 # ── 표 XML 생성 ────────────────────────────────────────────────────────────────
 def _build_table_xml(headers: list, rows: list, table_id: int) -> str:
     col_count = max(len(headers), 1)
     row_count = len(rows) + 1
-    cell_w = _TABLE_WIDTH // col_count
-    last_w = _TABLE_WIDTH - cell_w * (col_count - 1)
+    col_widths = _calc_col_widths(headers, rows)
 
     def cell_width(col_idx: int) -> int:
-        return last_w if col_idx == col_count - 1 else cell_w
+        return col_widths[col_idx] if col_idx < len(col_widths) else _TABLE_WIDTH // col_count
 
     tbl = (
         f'<hp:p id="0" paraPrIDRef="1" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
