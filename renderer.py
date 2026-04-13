@@ -11,83 +11,101 @@ def render_html(doc_json: dict) -> str:
 <head>
   <meta charset="utf-8">
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700&display=swap');
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      background: #e8e8e8;
-      font-family: 'Malgun Gothic', 'HY헤드라인M', sans-serif;
+      background: #d0d0d0;
+      font-family: 'HY헤드라인M', 'NanumMyeongjo', 'Nanum Myeongjo', '휴먼명조', 'Batang', serif;
       padding: 32px 16px;
     }
 
-    /* A4 용지 */
+    /* A4 용지 - 편집여백: 위아래15mm, 좌우23mm */
     .page {
       background: #fff;
       width: 100%;
-      max-width: 740px;
+      max-width: 760px;
       margin: 0 auto;
-      padding: 38px 48px 52px;
-      box-shadow: 0 2px 12px rgba(0,0,0,.15);
-      min-height: 500px;
+      padding: 42px 60px 56px;
+      box-shadow: 0 3px 16px rgba(0,0,0,.22);
+      min-height: 600px;
     }
 
-    /* 제목 박스 (base_new.hwpx borderFillIDRef=6 스타일) */
+    /* 제목 박스 - K-water 표준서식 */
     .title-box {
-      border-top: 3px solid #0099FF;
-      border-bottom: 3px solid #0099FF;
-      background: linear-gradient(to bottom, #ffffff, #CCFFFF);
-      padding: 14px 20px;
-      margin-bottom: 24px;
+      border: 1.5px solid #333;
+      padding: 14px 20px 10px;
+      margin-bottom: 10px;
       text-align: center;
     }
     .title-box h1 {
-      font-size: 20px;
-      font-weight: 700;
-      color: #003366;
-      letter-spacing: 0.5px;
+      font-family: 'HY헤드라인M', 'Malgun Gothic', sans-serif;
+      font-size: 22px;
+      font-weight: 900;
+      color: #000;
+      letter-spacing: 1px;
     }
 
-    /* 구분선 (charPrIDRef=3 스타일) */
-    .divider {
-      border: none;
-      border-top: 1px solid #aaa;
-      margin-bottom: 20px;
-    }
-
-    /* 섹션 제목 (charPrIDRef=4 스타일) */
-    .section-heading {
-      font-size: 15px;
-      font-weight: 700;
-      color: #111;
-      margin: 22px 0 8px;
-      padding-bottom: 2px;
-    }
-
-    /* 본문 (charPrIDRef=23 스타일) */
-    .body-text {
-      font-size: 13.5px;
-      color: #222;
-      line-height: 1.8;
-      white-space: pre-wrap;
-      margin-bottom: 6px;
-    }
-
-    /* 표 (borderFillIDRef=7 - 일반 선) */
-    .doc-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 10px 0 14px;
-      font-size: 13px;
-    }
-    .doc-table th, .doc-table td {
+    /* 취지 박스 */
+    .purpose-box {
       border: 1px solid #555;
-      padding: 6px 10px;
-      vertical-align: middle;
-      text-align: center;
+      background: #f9f9f9;
+      padding: 8px 16px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      color: #333;
       line-height: 1.6;
     }
 
-    /* 섹션 사이 여백 */
-    .section-gap { height: 6px; }
+    /* 섹션 제목 - 헤드라인M 16pt */
+    .section-heading {
+      font-family: 'HY헤드라인M', 'Malgun Gothic', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      color: #000;
+      margin: 20px 0 6px;
+    }
+
+    /* 본문 - TH 휴먼명조 15pt, 줄간격 150~160% */
+    .body-text {
+      font-family: 'NanumMyeongjo', 'Nanum Myeongjo', '휴먼명조', 'Batang', serif;
+      font-size: 15px;
+      color: #111;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      margin-bottom: 4px;
+    }
+
+    /* 참고내용 - 중고딕 13pt, * 표시 */
+    .ref-text {
+      font-family: 'Malgun Gothic', sans-serif;
+      font-size: 13px;
+      color: #333;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      margin: 2px 0 4px 8px;
+    }
+
+    /* 표 */
+    .doc-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 8px 0 14px;
+      font-size: 14px;
+      font-family: 'NanumMyeongjo', '휴먼명조', 'Batang', serif;
+    }
+    .doc-table th, .doc-table td {
+      border: 1px solid #444;
+      padding: 6px 10px;
+      vertical-align: middle;
+      text-align: center;
+      line-height: 1.5;
+    }
+    .doc-table th {
+      background: #f0f0f0;
+      font-weight: 700;
+    }
   </style>
 </head>
 <body>
@@ -108,9 +126,15 @@ def render_html(doc_json: dict) -> str:
             parts.append(f'  <div class="section-heading">{text}</div>\n')
 
         elif btype == "paragraph":
-            text = escape(block.get("text", ""))
-            if text:
-                parts.append(f'  <div class="body-text">{text}</div>\n')
+            raw = block.get("text", "")
+            if raw:
+                lines = raw.split("\n")
+                for line in lines:
+                    escaped = escape(line)
+                    if line.lstrip().startswith("*"):
+                        parts.append(f'  <div class="ref-text">{escaped}</div>\n')
+                    else:
+                        parts.append(f'  <div class="body-text">{escaped}</div>\n')
 
         elif btype == "bullet_list":
             items = block.get("items", [])
