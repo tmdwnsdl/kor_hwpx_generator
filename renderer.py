@@ -1,4 +1,10 @@
+import re
 from html import escape
+
+
+def _apply_bold(text: str) -> str:
+    """**text** 마크다운 볼드를 <strong> 태그로 변환"""
+    return re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
 
 
 def render_html(doc_json: dict) -> str:
@@ -17,7 +23,6 @@ def render_html(doc_json: dict) -> str:
 
     body {
       background: #d0d0d0;
-      font-family: 'HY헤드라인M', 'NanumMyeongjo', 'Nanum Myeongjo', '휴먼명조', 'Batang', serif;
       padding: 32px 16px;
     }
 
@@ -32,11 +37,13 @@ def render_html(doc_json: dict) -> str:
       min-height: 600px;
     }
 
-    /* 제목 박스 - K-water 표준서식 */
+    /* 제목 박스 - borderFill id=4: 위아래 #0099FF 2mm, 배경 그라디언트 */
     .title-box {
-      border: 1.5px solid #333;
-      padding: 14px 20px 10px;
-      margin-bottom: 10px;
+      border-top: 3px solid #0099FF;
+      border-bottom: 3px solid #0099FF;
+      background: linear-gradient(to bottom, #FFFFFF, #CCFFFF);
+      padding: 14px 20px 12px;
+      margin-bottom: 18px;
       text-align: center;
     }
     .title-box h1 {
@@ -47,7 +54,7 @@ def render_html(doc_json: dict) -> str:
       letter-spacing: 1px;
     }
 
-    /* 섹션 제목 - 헤드라인M 16pt */
+    /* 섹션 제목 - HY헤드라인M 16pt */
     .section-heading {
       font-family: 'HY헤드라인M', 'Malgun Gothic', sans-serif;
       font-size: 16px;
@@ -62,8 +69,7 @@ def render_html(doc_json: dict) -> str:
       font-size: 15px;
       color: #111;
       line-height: 1.55;
-      white-space: pre-wrap;
-      margin-bottom: 4px;
+      margin-bottom: 3px;
     }
 
     /* 참고내용 - 중고딕 13pt, * 표시 */
@@ -72,8 +78,7 @@ def render_html(doc_json: dict) -> str:
       font-size: 13px;
       color: #333;
       line-height: 1.5;
-      white-space: pre-wrap;
-      margin: 2px 0 4px 8px;
+      margin: 2px 0 3px 8px;
     }
 
     /* 표 */
@@ -110,25 +115,24 @@ def render_html(doc_json: dict) -> str:
         btype = block.get("type")
 
         if btype == "heading":
-            text = escape(block.get("text", ""))
+            text = _apply_bold(escape(block.get("text", "")))
             parts.append(f'  <div class="section-heading">{text}</div>\n')
 
         elif btype == "paragraph":
             raw = block.get("text", "")
             if raw:
-                lines = raw.split("\n")
-                for line in lines:
-                    escaped = escape(line)
+                for line in raw.split("\n"):
+                    rendered = _apply_bold(escape(line))
                     if line.lstrip().startswith("*"):
-                        parts.append(f'  <div class="ref-text">{escaped}</div>\n')
+                        parts.append(f'  <div class="ref-text">{rendered}</div>\n')
                     else:
-                        parts.append(f'  <div class="body-text">{escaped}</div>\n')
+                        parts.append(f'  <div class="body-text">{rendered}</div>\n')
 
         elif btype == "bullet_list":
             items = block.get("items", [])
-            parts.append('  <ul style="margin:6px 0 6px 20px; font-size:13.5px; line-height:1.8;">\n')
+            parts.append('  <ul style="margin:6px 0 6px 20px; font-size:15px; line-height:1.55; font-family:\'NanumMyeongjo\',\'Batang\',serif;">\n')
             for item in items:
-                parts.append(f'    <li>{escape(str(item))}</li>\n')
+                parts.append(f'    <li>{_apply_bold(escape(str(item)))}</li>\n')
             parts.append('  </ul>\n')
 
         elif btype in ("table", "simple_table"):
@@ -138,13 +142,13 @@ def render_html(doc_json: dict) -> str:
             if headers:
                 parts.append('    <thead><tr>\n')
                 for h in headers:
-                    parts.append(f'      <th>{escape(str(h))}</th>\n')
+                    parts.append(f'      <th>{_apply_bold(escape(str(h)))}</th>\n')
                 parts.append('    </tr></thead>\n')
             parts.append('    <tbody>\n')
             for row in rows:
                 parts.append('    <tr>\n')
                 for cell in row:
-                    parts.append(f'      <td>{escape(str(cell))}</td>\n')
+                    parts.append(f'      <td>{_apply_bold(escape(str(cell)))}</td>\n')
                 parts.append('    </tr>\n')
             parts.append('    </tbody>\n')
             parts.append('  </table>\n')
@@ -155,18 +159,18 @@ def render_html(doc_json: dict) -> str:
 
 if __name__ == "__main__":
     sample_doc = {
-        "title": "LLM 기술 활용 방안",
+        "title": "공공기관 LLM 서비스 도입",
         "blocks": [
             {"type": "heading", "text": "1. 추진배경"},
-            {"type": "paragraph", "text": "최근 인공지능 기술의 급속한 발전으로 LLM 도입의 필요성이 대두되고 있음."},
-            {"type": "heading", "text": "2. 주요내용"},
-            {"type": "paragraph", "text": "LLM 기반 업무 자동화 및 보고서 작성 지원 시스템 구축을 추진함."},
+            {"type": "paragraph", "text": "□ **디지털 전환** 가속화: 공공기관의 **디지털 전환** 필요성이 급증하고 있음.\n□ **효율성** 증대 필요: 인공지능 기술을 활용하여 업무 효율성을 높일 필요가 있음.\n* 관련 근거: 디지털정부법 제00조"},
+            {"type": "heading", "text": "2. 현황 및 문제점"},
+            {"type": "paragraph", "text": "□ **인공지능 도입 사례**: 일부 기관에서 **AI** 활용을 위한 초기 단계\n□ **기술적 한계**: LLM 서비스에 대한 기술적 이해와 인프라 부족"},
+            {"type": "heading", "text": "3. 추진방향 및 계획"},
+            {"type": "paragraph", "text": "□ **LLM 서비스** 구축 목표 설정: 공공서비스에 맞는 **맞춤형 LLM** 도입"},
             {"type": "table",
-             "headers": ["기술", "활용 분야", "기대효과"],
-             "rows": [["GPT-4o", "보고서 작성", "업무 효율 향상"],
-                      ["Claude", "문서 분석", "정확도 개선"]]},
-            {"type": "heading", "text": "3. 기대효과"},
-            {"type": "paragraph", "text": "본 사업을 통해 연간 업무 시간 30% 절감 및 보고서 품질 향상이 기대됨."},
+             "headers": ["구분", "내용", "일정"],
+             "rows": [["1단계", "기반 인프라 구축", "'26. 1분기"],
+                      ["2단계", "파일럿 서비스 운영", "'26. 2분기"]]},
         ]
     }
     html = render_html(sample_doc)
