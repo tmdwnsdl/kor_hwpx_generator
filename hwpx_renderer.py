@@ -47,7 +47,7 @@ def _build_table_xml(headers: list, rows: list, table_id: int) -> str:
         f'<hp:run charPrIDRef="23">'
         f'<hp:tbl id="{table_id}" zOrder="0" numberingType="TABLE" textWrap="TOP_AND_BOTTOM" '
         f'textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" pageBreak="CELL" repeatHeader="1" '
-        f'rowCnt="{row_count}" colCnt="{col_count}" cellSpacing="0" borderFillIDRef="7" noAdjust="0">'
+        f'rowCnt="{row_count}" colCnt="{col_count}" cellSpacing="0" borderFillIDRef="3" noAdjust="0">'
         f'<hp:sz width="{_TABLE_WIDTH}" widthRelTo="ABSOLUTE" '
         f'height="{_CELL_HEIGHT * row_count}" heightRelTo="ABSOLUTE" protect="0"/>'
         f'<hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="0" '
@@ -59,7 +59,7 @@ def _build_table_xml(headers: list, rows: list, table_id: int) -> str:
 
     for ci, h in enumerate(headers):
         tbl += (
-            f'<hp:tr><hp:tc name="" header="0" hasMargin="0" protect="0" editable="0" dirty="0" borderFillIDRef="7">'
+            f'<hp:tr><hp:tc name="" header="0" hasMargin="0" protect="0" editable="0" dirty="0" borderFillIDRef="3">'
             f'<hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="CENTER" '
             f'linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">'
             f'<hp:p id="0" paraPrIDRef="2" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
@@ -71,7 +71,7 @@ def _build_table_xml(headers: list, rows: list, table_id: int) -> str:
             f'<hp:cellMargin left="140" right="140" top="140" bottom="140"/></hp:tc></hp:tr>'
         ) if ci == 0 else (
             tbl + (
-                f'<hp:tc name="" header="0" hasMargin="0" protect="0" editable="0" dirty="0" borderFillIDRef="7">'
+                f'<hp:tc name="" header="0" hasMargin="0" protect="0" editable="0" dirty="0" borderFillIDRef="3">'
                 f'<hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="CENTER" '
                 f'linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">'
                 f'<hp:p id="0" paraPrIDRef="2" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
@@ -90,7 +90,7 @@ def _build_table_xml(headers: list, rows: list, table_id: int) -> str:
         f'<hp:run charPrIDRef="{_CHAR_BODY}">'
         f'<hp:tbl id="{table_id}" zOrder="0" numberingType="TABLE" textWrap="TOP_AND_BOTTOM" '
         f'textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" pageBreak="CELL" repeatHeader="1" '
-        f'rowCnt="{row_count}" colCnt="{col_count}" cellSpacing="0" borderFillIDRef="7" noAdjust="0">'
+        f'rowCnt="{row_count}" colCnt="{col_count}" cellSpacing="0" borderFillIDRef="3" noAdjust="0">'
         f'<hp:sz width="{_TABLE_WIDTH}" widthRelTo="ABSOLUTE" '
         f'height="{_CELL_HEIGHT * row_count}" heightRelTo="ABSOLUTE" protect="0"/>'
         f'<hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="0" '
@@ -104,7 +104,7 @@ def _build_table_xml(headers: list, rows: list, table_id: int) -> str:
     tbl += '<hp:tr>'
     for ci, h in enumerate(headers):
         tbl += (
-            f'<hp:tc name="" header="0" hasMargin="0" protect="0" editable="0" dirty="0" borderFillIDRef="7">'
+            f'<hp:tc name="" header="0" hasMargin="0" protect="0" editable="0" dirty="0" borderFillIDRef="3">'
             f'<hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="CENTER" '
             f'linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">'
             f'<hp:p id="0" paraPrIDRef="1" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
@@ -123,7 +123,7 @@ def _build_table_xml(headers: list, rows: list, table_id: int) -> str:
         for ci in range(col_count):
             cell_text = str(row[ci]) if ci < len(row) else ""
             tbl += (
-                f'<hp:tc name="" header="0" hasMargin="0" protect="0" editable="0" dirty="0" borderFillIDRef="7">'
+                f'<hp:tc name="" header="0" hasMargin="0" protect="0" editable="0" dirty="0" borderFillIDRef="3">'
                 f'<hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="CENTER" '
                 f'linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">'
                 f'<hp:p id="0" paraPrIDRef="1" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
