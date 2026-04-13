@@ -2,159 +2,162 @@ from html import escape
 
 
 def render_html(doc_json: dict) -> str:
-    """
-    JSON 문서 구조를 HTML 문자열로 변환한다.
-    지원 블록:
-    - heading
-    - paragraph
-    - bullet_list
-    - table
-    """
-
     title = escape(doc_json.get("title", ""))
     blocks = doc_json.get("blocks", [])
 
-    html_parts = []
+    parts = []
+    parts.append("""<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    # 문서 전체 wrapper
-    html_parts.append("""
-    <html>
-    <head>
-        <meta charset="utf-8">
-        <title>문서 미리보기</title>
-        <style>
-            body {
-                font-family: "Malgun Gothic", Arial, sans-serif;
-                line-height: 1.6;
-                max-width: 900px;
-                margin: 40px auto;
-                padding: 0 24px;
-                color: #222;
-                background: #fff;
-            }
-            h1, h2, h3, h4, h5, h6 {
-                margin-top: 1.4em;
-                margin-bottom: 0.6em;
-            }
-            p {
-                margin: 0.8em 0;
-                white-space: pre-wrap;
-            }
-            ul {
-                margin: 0.8em 0 0.8em 1.2em;
-            }
-            table {
-                border-collapse: collapse;
-                width: 100%;
-                margin: 1em 0;
-            }
-            th, td {
-                border: 1px solid #999;
-                padding: 8px 10px;
-                text-align: left;
-                vertical-align: top;
-            }
-            th {
-                background: #f2f2f2;
-            }
-            .doc-title {
-                border-bottom: 2px solid #333;
-                padding-bottom: 10px;
-                margin-bottom: 24px;
-            }
-        </style>
-    </head>
-    <body>
-    """)
+    body {
+      background: #e8e8e8;
+      font-family: 'Malgun Gothic', 'HY헤드라인M', sans-serif;
+      padding: 32px 16px;
+    }
 
-    # 문서 제목
+    /* A4 용지 */
+    .page {
+      background: #fff;
+      width: 100%;
+      max-width: 740px;
+      margin: 0 auto;
+      padding: 38px 48px 52px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.15);
+      min-height: 500px;
+    }
+
+    /* 제목 박스 (base_new.hwpx borderFillIDRef=6 스타일) */
+    .title-box {
+      border-top: 3px solid #0099FF;
+      border-bottom: 3px solid #0099FF;
+      background: linear-gradient(to bottom, #ffffff, #CCFFFF);
+      padding: 14px 20px;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+    .title-box h1 {
+      font-size: 20px;
+      font-weight: 700;
+      color: #003366;
+      letter-spacing: 0.5px;
+    }
+
+    /* 구분선 (charPrIDRef=3 스타일) */
+    .divider {
+      border: none;
+      border-top: 1px solid #aaa;
+      margin-bottom: 20px;
+    }
+
+    /* 섹션 제목 (charPrIDRef=4 스타일) */
+    .section-heading {
+      font-size: 15px;
+      font-weight: 700;
+      color: #111;
+      margin: 22px 0 8px;
+      padding-bottom: 2px;
+    }
+
+    /* 본문 (charPrIDRef=23 스타일) */
+    .body-text {
+      font-size: 13.5px;
+      color: #222;
+      line-height: 1.8;
+      white-space: pre-wrap;
+      margin-bottom: 6px;
+    }
+
+    /* 표 (borderFillIDRef=7 - 일반 선) */
+    .doc-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0 14px;
+      font-size: 13px;
+    }
+    .doc-table th, .doc-table td {
+      border: 1px solid #555;
+      padding: 6px 10px;
+      vertical-align: middle;
+      text-align: center;
+      line-height: 1.6;
+    }
+
+    /* 섹션 사이 여백 */
+    .section-gap { height: 6px; }
+  </style>
+</head>
+<body>
+<div class="page">
+""")
+
+    # 제목 박스
     if title:
-        html_parts.append(f'<h1 class="doc-title">{title}</h1>')
+        parts.append(f'  <div class="title-box"><h1>{title}</h1></div>\n')
+        parts.append('  <hr class="divider">\n')
 
     # 블록 렌더링
     for block in blocks:
-        block_type = block.get("type")
+        btype = block.get("type")
 
-        if block_type == "heading":
-            level = block.get("level", 1)
-
-            # h1 ~ h6 범위 제한
-            if not isinstance(level, int) or level < 1:
-                level = 1
-            if level > 6:
-                level = 6
-
+        if btype == "heading":
             text = escape(block.get("text", ""))
-            html_parts.append(f"<h{level}>{text}</h{level}>")
+            parts.append(f'  <div class="section-heading">{text}</div>\n')
 
-        elif block_type == "paragraph":
+        elif btype == "paragraph":
             text = escape(block.get("text", ""))
-            html_parts.append(f"<p>{text}</p>")
+            if text:
+                parts.append(f'  <div class="body-text">{text}</div>\n')
 
-        elif block_type == "bullet_list":
+        elif btype == "bullet_list":
             items = block.get("items", [])
-            html_parts.append("<ul>")
+            parts.append('  <ul style="margin:6px 0 6px 20px; font-size:13.5px; line-height:1.8;">\n')
             for item in items:
-                html_parts.append(f"<li>{escape(str(item))}</li>")
-            html_parts.append("</ul>")
+                parts.append(f'    <li>{escape(str(item))}</li>\n')
+            parts.append('  </ul>\n')
 
-        elif block_type == "table":
+        elif btype in ("table", "simple_table"):
             headers = block.get("headers", [])
             rows = block.get("rows", [])
-
-            html_parts.append("<table>")
-
-            # 헤더
+            parts.append('  <table class="doc-table">\n')
             if headers:
-                html_parts.append("<thead><tr>")
-                for header in headers:
-                    html_parts.append(f"<th>{escape(str(header))}</th>")
-                html_parts.append("</tr></thead>")
-
-            # 바디
-            html_parts.append("<tbody>")
+                parts.append('    <thead><tr>\n')
+                for h in headers:
+                    parts.append(f'      <th>{escape(str(h))}</th>\n')
+                parts.append('    </tr></thead>\n')
+            parts.append('    <tbody>\n')
             for row in rows:
-                html_parts.append("<tr>")
+                parts.append('    <tr>\n')
                 for cell in row:
-                    html_parts.append(f"<td>{escape(str(cell))}</td>")
-                html_parts.append("</tr>")
-            html_parts.append("</tbody>")
+                    parts.append(f'      <td>{escape(str(cell))}</td>\n')
+                parts.append('    </tr>\n')
+            parts.append('    </tbody>\n')
+            parts.append('  </table>\n')
 
-            html_parts.append("</table>")
-
-        else:
-            # 아직 지원하지 않는 타입은 무시
-            continue
-
-    html_parts.append("""
-    </body>
-    </html>
-    """)
-
-    return "".join(html_parts)
+    parts.append("</div>\n</body>\n</html>")
+    return "".join(parts)
 
 
 if __name__ == "__main__":
     sample_doc = {
-        "title": "문서 자동화 보고서",
+        "title": "LLM 기술 활용 방안",
         "blocks": [
-            {"type": "heading", "level": 1, "text": "1. 개요"},
-            {"type": "paragraph", "text": "이 보고서는 문서 자동화 방향을 검토하기 위해 작성되었다."},
-            {"type": "bullet_list", "items": ["초안 자동 생성", "HTML 미리보기", "최종 HWPX 생성"]},
-            {
-                "type": "table",
-                "headers": ["구분", "내용"],
-                "rows": [
-                    ["목표", "문서 작성 자동화"],
-                    ["방식", "JSON 기반 렌더링"]
-                ]
-            }
+            {"type": "heading", "text": "1. 추진배경"},
+            {"type": "paragraph", "text": "최근 인공지능 기술의 급속한 발전으로 LLM 도입의 필요성이 대두되고 있음."},
+            {"type": "heading", "text": "2. 주요내용"},
+            {"type": "paragraph", "text": "LLM 기반 업무 자동화 및 보고서 작성 지원 시스템 구축을 추진함."},
+            {"type": "table",
+             "headers": ["기술", "활용 분야", "기대효과"],
+             "rows": [["GPT-4o", "보고서 작성", "업무 효율 향상"],
+                      ["Claude", "문서 분석", "정확도 개선"]]},
+            {"type": "heading", "text": "3. 기대효과"},
+            {"type": "paragraph", "text": "본 사업을 통해 연간 업무 시간 30% 절감 및 보고서 품질 향상이 기대됨."},
         ]
     }
-
     html = render_html(sample_doc)
-
     with open("preview_test.html", "w", encoding="utf-8") as f:
         f.write(html)
-
     print("preview_test.html 생성 완료")

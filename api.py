@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from command_processor import process_command
@@ -7,7 +7,7 @@ import uuid
 
 from renderer import render_html
 from hwpx_renderer import render_hwpx_real
-from chat_service import chat as chat_service, reset_session
+from chat_service import chat as chat_service, reset_session, store, _doc_to_blocks_json
 
 BASE_DIR = Path(__file__).resolve().parent
 OUTPUT_DIR = BASE_DIR / "storage" / "hwpx"
@@ -69,6 +69,23 @@ def download_hwpx(filename: str):
         filename=filename,
         media_type="application/octet-stream"
     )
+
+
+# ── 수동 HWPX 다운로드 ────────────────────────────────────────────────────────────
+@app.post("/render-hwpx")
+def render_hwpx_manual(data: dict):
+    """document_id를 받아 HWPX를 생성하고 다운로드 URL을 반환합니다."""
+    document_id = data.get("document_id", "")
+    if not document_id:
+        raise HTTPException(status_code=400, detail="document_id가 필요합니다.")
+    try:
+        doc = store.get(document_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="문서를 찾을 수 없습니다.")
+    blocks_json = _doc_to_blocks_json(doc)
+    path = render_hwpx_real(blocks_json)
+    filename = Path(path).name
+    return {"filename": filename, "download_url": f"/download-hwpx/{filename}"}
 
 
 # ── Chat endpoints ─────────────────────────────────────────────────────────────

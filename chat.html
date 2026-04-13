@@ -29,8 +29,7 @@
     header h1 { font-size: 18px; font-weight: 600; }
     header .subtitle { font-size: 13px; opacity: .8; }
     header .spacer { flex: 1; }
-    #btn-new-session {
-      background: rgba(255,255,255,.2);
+    #btn-new-session, #btn-download-hwpx {
       color: #fff;
       border: 1px solid rgba(255,255,255,.4);
       padding: 6px 14px;
@@ -39,7 +38,21 @@
       font-size: 13px;
       transition: background .2s;
     }
+    #btn-new-session {
+      background: rgba(255,255,255,.2);
+    }
     #btn-new-session:hover { background: rgba(255,255,255,.35); }
+    #btn-download-hwpx {
+      background: #34a853;
+      border-color: #2d9249;
+    }
+    #btn-download-hwpx:hover:not(:disabled) { background: #2d9249; }
+    #btn-download-hwpx:disabled {
+      background: rgba(255,255,255,.1);
+      border-color: rgba(255,255,255,.2);
+      color: rgba(255,255,255,.4);
+      cursor: not-allowed;
+    }
 
     /* Main layout */
     .main {
@@ -130,32 +143,6 @@
       40% { transform: translateY(-6px); }
     }
 
-    /* HWPX download banner */
-    .hwpx-banner {
-      display: none;
-      margin: 0 16px 8px;
-      padding: 10px 14px;
-      background: #e6f4ea;
-      border: 1px solid #34a853;
-      border-radius: 8px;
-      font-size: 13px;
-      color: #137333;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .hwpx-banner.hidden { display: none !important; }
-    .hwpx-banner a {
-      color: #137333;
-      font-weight: 600;
-      text-decoration: none;
-      border: 1px solid #34a853;
-      padding: 4px 10px;
-      border-radius: 5px;
-      margin-left: auto;
-      transition: background .2s;
-    }
-    .hwpx-banner a:hover { background: #ceead6; }
 
     /* Input area */
     .input-area {
@@ -266,6 +253,7 @@
   </div>
   <div class="spacer"></div>
   <button id="btn-new-session">+ 새 보고서</button>
+  <button id="btn-download-hwpx" disabled>⬇ HWPX 다운로드</button>
 </header>
 
 <div class="main">
@@ -287,11 +275,6 @@
 
     <div class="typing-indicator" id="typing">
       <span></span><span></span><span></span>
-    </div>
-
-    <div class="hwpx-banner hidden" id="hwpx-banner">
-      ✅ HWPX 파일이 생성되었습니다!
-      <a id="hwpx-link" href="#" download>다운로드</a>
     </div>
 
     <div class="input-area">
@@ -325,16 +308,16 @@
   const API = 'http://127.0.0.1:8000';
   let sessionId = localStorage.getItem('hwp_session_id') || crypto.randomUUID();
   localStorage.setItem('hwp_session_id', sessionId);
+  let currentDocumentId = null;
 
   const messagesEl = document.getElementById('messages');
   const inputEl = document.getElementById('user-input');
   const sendBtn = document.getElementById('btn-send');
   const typingEl = document.getElementById('typing');
-  const hwpxBanner = document.getElementById('hwpx-banner');
-  const hwpxLink = document.getElementById('hwpx-link');
   const previewFrame = document.getElementById('preview-frame');
   const previewEmpty = document.getElementById('preview-empty');
   const previewDocTitle = document.getElementById('preview-doc-title');
+  const downloadBtn = document.getElementById('btn-download-hwpx');
 
   // ── Auto-resize textarea ──────────────────────────────────────────────────
   inputEl.addEventListener('input', () => {
@@ -403,13 +386,6 @@
     }
   }
 
-  function showHwpxBanner(url) {
-    hwpxBanner.classList.remove('hidden');
-    hwpxLink.href = API + url;
-    hwpxLink.setAttribute('download', url.split('/').pop());
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-  }
-
   // ── Send message ──────────────────────────────────────────────────────────
   async function sendMessage() {
     const text = inputEl.value.trim();
@@ -437,9 +413,9 @@
         if (data.document_json) {
           updatePreview(data.document_json);
         }
-
-        if (data.hwpx_url) {
-          showHwpxBanner(data.hwpx_url);
+        if (data.document_id) {
+          currentDocumentId = data.document_id;
+          downloadBtn.disabled = false;
         }
       }
     } catch (err) {
@@ -451,29 +427,55 @@
     }
   }
 
+  // ── Download HWPX ─────────────────────────────────────────────────────────
+  downloadBtn.addEventListener('click', async () => {
+    if (!currentDocumentId) return;
+    downloadBtn.disabled = true;
+    downloadBtn.textContent = '⏳ 생성 중...';
+    try {
+      const resp = await fetch(`${API}/render-hwpx`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ document_id: currentDocumentId }),
+      });
+      const data = await resp.json();
+      if (data.download_url) {
+        const a = document.createElement('a');
+        a.href = API + data.download_url;
+        a.download = data.filename;
+        a.click();
+      }
+    } catch (err) {
+      alert('HWPX 생성에 실패했습니다.');
+      console.error(err);
+    } finally {
+      downloadBtn.disabled = false;
+      downloadBtn.textContent = '⬇ HWPX 다운로드';
+    }
+  });
+
   // ── New session ───────────────────────────────────────────────────────────
   async function newSession() {
     if (!confirm('새 보고서를 시작하면 현재 대화 내용이 초기화됩니다. 계속하시겠습니까?')) return;
 
-    // Reset server session
     await fetch(`${API}/chat/reset`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ session_id: sessionId }),
     }).catch(() => {});
 
-    // New session ID
     sessionId = crypto.randomUUID();
     localStorage.setItem('hwp_session_id', sessionId);
+    currentDocumentId = null;
 
-    // Reset UI
     messagesEl.innerHTML = `
       <div class="msg assistant">
         <div class="avatar">🤖</div>
         <div class="bubble">새 보고서 작성을 시작합니다. 어떤 보고서를 작성하고 싶으신가요?</div>
       </div>`;
 
-    hwpxBanner.classList.add('hidden');
+    downloadBtn.disabled = true;
+    downloadBtn.textContent = '⬇ HWPX 다운로드';
     previewFrame.style.display = 'none';
     previewFrame.srcdoc = '';
     previewEmpty.style.display = 'flex';

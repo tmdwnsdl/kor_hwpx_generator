@@ -251,6 +251,42 @@ TOOLS: List[dict] = [
     {
         "type": "function",
         "function": {
+            "name": "update_table",
+            "description": (
+                "특정 섹션의 기존 표를 수정합니다. "
+                "table_index는 해당 섹션에서 표의 순서(0부터 시작)입니다. "
+                "headers 또는 rows 중 변경할 항목만 전달해도 됩니다."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "document_id": {"type": "string"},
+                    "section_key": {
+                        "type": "string",
+                        "description": "create_report_draft에서 지정한 섹션 key값",
+                    },
+                    "table_index": {
+                        "type": "integer",
+                        "description": "수정할 표의 순서 (0부터 시작, 섹션 내 표 기준)",
+                    },
+                    "headers": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "새 헤더 목록 (변경 시에만 전달)",
+                    },
+                    "rows": {
+                        "type": "array",
+                        "items": {"type": "array", "items": {"type": "string"}},
+                        "description": "새 데이터 행 목록 (변경 시에만 전달)",
+                    },
+                },
+                "required": ["document_id", "section_key", "table_index"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "get_document",
             "description": "현재 문서의 전체 내용을 조회합니다.",
             "parameters": {
@@ -273,28 +309,6 @@ TOOLS: List[dict] = [
                     "document_id": {"type": "string"},
                 },
                 "required": ["document_id"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_writing_guide",
-            "description": (
-                "K-water 보고서 작성 가이드를 조회합니다. "
-                "보고서 작성 전에 반드시 호출하여 작성 원칙과 유형별 방법을 참고하세요. "
-                "section: 'general'(작성 기본원칙), '기획보고서', '현황보고서', '회의계획서', '행사계획서'"
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "section": {
-                        "type": "string",
-                        "enum": ["general", "기획보고서", "현황보고서", "회의계획서", "행사계획서"],
-                        "description": "조회할 가이드 섹션",
-                    },
-                },
-                "required": ["section"],
             },
         },
     },
@@ -355,6 +369,31 @@ def _execute_tool(name: str, inputs: dict) -> dict:
                 "updated_at": doc.updated_at,
             }
 
+        elif name == "update_table":
+            doc = store.get(inputs["document_id"])
+            section = next(
+                (s for s in doc.sections if s.key == inputs["section_key"]), None
+            )
+            if section is None:
+                return {"error": f"section_key '{inputs['section_key']}' not found"}
+            # 섹션 내 표만 필터링해서 index로 찾기
+            table_blocks = [b for b in section.blocks if b.get("type") == "simple_table"]
+            idx = inputs["table_index"]
+            if idx < 0 or idx >= len(table_blocks):
+                return {"error": f"table_index {idx} out of range (표 {len(table_blocks)}개 존재)"}
+            target = table_blocks[idx]
+            if "headers" in inputs:
+                target["headers"] = inputs["headers"]
+            if "rows" in inputs:
+                target["rows"] = inputs["rows"]
+            store.save(doc)
+            return {
+                "document_id": inputs["document_id"],
+                "section_key": inputs["section_key"],
+                "table_index": idx,
+                "updated_at": doc.updated_at,
+            }
+
         elif name == "get_document":
             doc = store.get(inputs["document_id"])
             return store.to_dict(doc)
@@ -370,18 +409,6 @@ def _execute_tool(name: str, inputs: dict) -> dict:
                 "filename": p.name,
                 "download_url": f"/download-hwpx/{p.name}",
             }
-
-        elif name == "get_writing_guide":
-            guide_path = BASE_DIR / "guides" / "kwater_writing_guide.json"
-            with open(guide_path, encoding="utf-8") as f:
-                guide = json.load(f)
-            section = inputs["section"]
-            if section == "general":
-                return {"section": "general", "content": guide["general_principles"]}
-            elif section in guide["report_types"]:
-                return {"section": section, "content": guide["report_types"][section]}
-            else:
-                return {"error": f"Unknown section: {section}"}
 
         else:
             return {"error": f"Unknown tool: {name}"}
@@ -403,19 +430,12 @@ SYSTEM_PROMPT = """당신은 한국 공공기관 및 기업의 공식 보고서 
   - 예) 행사계획서: 행사개요→시간계획→사전준비계획→행정사항
 
 작업 흐름:
-  1. 사용자 요청 파악 → get_writing_guide 호출로 보고서 유형별 작성 가이드 참조
-  2. 가이드 기반으로 적절한 섹션 구성 결정
-  3. create_report_draft 호출 시 sections 파라미터에 섹션 목록 전달
-  4. 각 섹션 내용을 set_section_text로 입력 (section_key는 step 3에서 정의한 key 사용)
-  5. 표가 필요하면 add_simple_table 호출
-  6. 내용 완성 후 render_hwpx 호출 → HWPX 파일 생성
-  7. 생성 완료 후 다운로드 링크 안내
-
-가이드 활용 원칙:
-  - 보고서 유형에 따라 get_writing_guide의 section 선택
-    ('기획보고서', '현황보고서', '회의계획서', '행사계획서', 'general')
-  - 유형이 불분명하면 'general'로 기본원칙을 먼저 조회
-  - 가이드의 작성 순서와 항목 구성을 섹션 설계에 반영
+  1. 사용자 요청 파악 → 보고서 유형에 맞는 섹션 구성 결정
+  2. create_report_draft 호출 시 sections 파라미터에 섹션 목록 전달
+  3. 각 섹션 내용을 set_section_text로 입력 (section_key는 step 2에서 정의한 key 사용)
+  4. 표가 필요하면 add_simple_table 호출
+  5. 내용 완성 후 render_hwpx 호출 → HWPX 파일 생성
+  6. 생성 완료 후 다운로드 링크 안내
 
 글쓰기 원칙:
   - 공식적이고 명확한 문체 사용 (서술형 개조식: ~하였음 형태)

@@ -230,13 +230,12 @@ def render_hwpx_real(doc_json: dict) -> str:
             ).encode("utf-8")
 
         # 4. __BODY_CONTENT__ 단락 전체를 생성된 섹션 XML로 교체
-        match = re.search(
-            rb"<hp:p [^>]*>.*?__BODY_CONTENT__.*?</hp:p>",
-            xml_bytes,
-            re.DOTALL,
-        )
-        if match:
-            xml_bytes = xml_bytes[: match.start()] + body_xml + xml_bytes[match.end() :]
+        # rfind로 해당 단락의 정확한 <hp:p> 시작점을 찾아 교체 (regex DOTALL 오작동 방지)
+        ph_pos = xml_bytes.find(b"__BODY_CONTENT__")
+        if ph_pos >= 0:
+            para_start = xml_bytes.rfind(b"<hp:p ", 0, ph_pos)
+            para_end = xml_bytes.find(b"</hp:p>", ph_pos) + len(b"</hp:p>")
+            xml_bytes = xml_bytes[:para_start] + body_xml + xml_bytes[para_end:]
 
         section_path.write_bytes(xml_bytes)
 
