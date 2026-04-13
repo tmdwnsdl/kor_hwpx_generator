@@ -47,17 +47,6 @@ def render_html(doc_json: dict) -> str:
       letter-spacing: 1px;
     }
 
-    /* 취지 박스 */
-    .purpose-box {
-      border: 1px solid #555;
-      background: #f9f9f9;
-      padding: 8px 16px;
-      margin-bottom: 20px;
-      font-size: 14px;
-      color: #333;
-      line-height: 1.6;
-    }
-
     /* 섹션 제목 - 헤드라인M 16pt */
     .section-heading {
       font-family: 'HY헤드라인M', 'Malgun Gothic', sans-serif;
@@ -115,7 +104,6 @@ def render_html(doc_json: dict) -> str:
     # 제목 박스
     if title:
         parts.append(f'  <div class="title-box"><h1>{title}</h1></div>\n')
-        parts.append('  <hr class="divider">\n')
 
     # 블록 렌더링
     for block in blocks:
