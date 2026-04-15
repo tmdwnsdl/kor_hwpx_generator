@@ -506,9 +506,10 @@ _sessions: Dict[str, List[dict]] = {}
 _session_docs: Dict[str, Optional[str]] = {}
 
 
-def chat(session_id: str, user_message: str) -> dict:
+def chat(session_id: str, user_message: str, file_content: Optional[str] = None) -> dict:
     """
     사용자 메시지를 처리하고 Claude 응답을 반환합니다.
+    file_content가 있으면 MD 파일 내용을 컨텍스트로 함께 전달합니다.
 
     Returns:
         {
@@ -525,7 +526,19 @@ def chat(session_id: str, user_message: str) -> dict:
         _session_docs[session_id] = None
 
     messages = _sessions[session_id]
-    messages.append({"role": "user", "content": user_message})
+
+    # MD 파일 첨부 시 파일 내용을 컨텍스트로 삽입
+    if file_content:
+        full_message = (
+            f"[첨부 파일 내용 - 아래 내용을 참고하여 작업해주세요]\n\n"
+            f"{file_content}\n\n"
+            f"---\n\n"
+            f"{user_message}"
+        )
+    else:
+        full_message = user_message
+
+    messages.append({"role": "user", "content": full_message})
 
     client = openai.OpenAI()
     hwpx_url: Optional[str] = None

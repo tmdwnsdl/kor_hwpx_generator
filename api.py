@@ -92,12 +92,13 @@ def render_hwpx_manual(data: dict):
 
 @app.post("/chat")
 def chat(data: dict):
-    """LLM과 대화하여 HWPX 보고서를 작성합니다."""
+    """LLM과 대화하여 HWPX 보고서를 작성합니다. file_content(MD 파일 내용)를 선택적으로 포함할 수 있습니다."""
     session_id = data.get("session_id") or str(uuid.uuid4())
     message = data.get("message", "").strip()
+    file_content = data.get("file_content") or None
     if not message:
         return {"error": "message가 비어 있습니다."}
-    return chat_service(session_id=session_id, user_message=message)
+    return chat_service(session_id=session_id, user_message=message, file_content=file_content)
 
 
 @app.post("/chat/reset")
