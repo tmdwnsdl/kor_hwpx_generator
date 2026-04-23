@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+from command_processor import process_command
 from pathlib import Path
 import uuid
 
@@ -27,6 +28,16 @@ def preview(doc_json: dict):
     JSON 문서를 받아 HTML로 변환해서 반환
     """
     return render_html(doc_json)
+
+
+@app.post("/command")
+def command(data: dict):
+    doc = data["doc"]
+    command = data["command"]
+
+    updated = process_command(doc, command)
+
+    return updated
 
 
 @app.post("/generate-hwpx")
@@ -81,13 +92,12 @@ def render_hwpx_manual(data: dict):
 
 @app.post("/chat")
 def chat(data: dict):
-    """LLM과 대화하여 HWPX 보고서를 작성합니다. file_content(MD 파일 내용)를 선택적으로 포함할 수 있습니다."""
+    """LLM과 대화하여 HWPX 보고서를 작성합니다."""
     session_id = data.get("session_id") or str(uuid.uuid4())
     message = data.get("message", "").strip()
-    file_content = data.get("file_content") or None
     if not message:
         return {"error": "message가 비어 있습니다."}
-    return chat_service(session_id=session_id, user_message=message, file_content=file_content)
+    return chat_service(session_id=session_id, user_message=message)
 
 
 @app.post("/chat/reset")

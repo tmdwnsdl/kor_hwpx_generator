@@ -144,26 +144,6 @@
     }
 
 
-    /* File badge */
-    .file-badge {
-      margin: 0 16px 0;
-      padding: 5px 10px;
-      background: #e8f4fd;
-      border: 1px solid #90caf9;
-      border-radius: 6px;
-      font-size: 12px;
-      color: #1565c0;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .file-badge span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .file-badge button {
-      background: none; border: none; cursor: pointer;
-      color: #1565c0; font-size: 13px; padding: 0; line-height: 1;
-    }
-    .file-badge button:hover { color: #c62828; }
-
     /* Input area */
     .input-area {
       padding: 12px 16px;
@@ -173,19 +153,6 @@
       align-items: flex-end;
       background: #fff;
     }
-    #btn-attach {
-      background: none;
-      border: 1px solid #dde1e7;
-      border-radius: 8px;
-      padding: 6px 8px;
-      font-size: 16px;
-      cursor: pointer;
-      color: #555;
-      flex-shrink: 0;
-      align-self: flex-end;
-      height: 36px;
-    }
-    #btn-attach:hover { background: #f0f4fa; }
     #user-input {
       flex: 1;
       border: 1px solid #dde1e7;
@@ -310,13 +277,7 @@
       <span></span><span></span><span></span>
     </div>
 
-    <div class="file-badge" id="file-badge" style="display:none;">
-      <span id="file-badge-name"></span>
-      <button id="file-badge-remove" title="파일 제거">✕</button>
-    </div>
     <div class="input-area">
-      <button id="btn-attach" title="MD 파일 첨부">📎</button>
-      <input type="file" id="file-input" accept=".md" style="display:none;">
       <textarea
         id="user-input"
         placeholder="메시지를 입력하세요... (Shift+Enter: 줄바꿈, Enter: 전송)"
@@ -357,36 +318,6 @@
   const previewEmpty = document.getElementById('preview-empty');
   const previewDocTitle = document.getElementById('preview-doc-title');
   const downloadBtn = document.getElementById('btn-download-hwpx');
-  const attachBtn = document.getElementById('btn-attach');
-  const fileInput = document.getElementById('file-input');
-  const fileBadge = document.getElementById('file-badge');
-  const fileBadgeName = document.getElementById('file-badge-name');
-  const fileBadgeRemove = document.getElementById('file-badge-remove');
-  let attachedFileContent = null;
-  let attachedFileName = null;
-
-  // ── File attach ───────────────────────────────────────────────────────────
-  attachBtn.addEventListener('click', () => fileInput.click());
-
-  fileInput.addEventListener('change', () => {
-    const file = fileInput.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      attachedFileContent = e.target.result;
-      attachedFileName = file.name;
-      fileBadgeName.textContent = '📄 ' + file.name;
-      fileBadge.style.display = 'flex';
-    };
-    reader.readAsText(file, 'utf-8');
-    fileInput.value = '';
-  });
-
-  fileBadgeRemove.addEventListener('click', () => {
-    attachedFileContent = null;
-    attachedFileName = null;
-    fileBadge.style.display = 'none';
-  });
 
   // ── Auto-resize textarea ──────────────────────────────────────────────────
   inputEl.addEventListener('input', () => {
@@ -460,31 +391,16 @@
     const text = inputEl.value.trim();
     if (!text) return;
 
-    // 파일 첨부 표시 (채팅 메시지에 파일명 표기)
-    const displayText = attachedFileName
-      ? `[📄 ${attachedFileName}]\n${text}`
-      : text;
-    appendMessage('user', displayText);
-
+    appendMessage('user', text);
     inputEl.value = '';
     inputEl.style.height = 'auto';
-
-    // 전송 후 뱃지 초기화
-    const fileContentToSend = attachedFileContent;
-    attachedFileContent = null;
-    attachedFileName = null;
-    fileBadge.style.display = 'none';
-
     setLoading(true);
 
     try {
-      const body = { session_id: sessionId, message: text };
-      if (fileContentToSend) body.file_content = fileContentToSend;
-
       const resp = await fetch(`${API}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ session_id: sessionId, message: text }),
       });
 
       const data = await resp.json();
@@ -551,9 +467,6 @@
     sessionId = crypto.randomUUID();
     localStorage.setItem('hwp_session_id', sessionId);
     currentDocumentId = null;
-    attachedFileContent = null;
-    attachedFileName = null;
-    fileBadge.style.display = 'none';
 
     messagesEl.innerHTML = `
       <div class="msg assistant">
