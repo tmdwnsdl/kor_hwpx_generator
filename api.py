@@ -1,7 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-from command_processor import process_command
 from pathlib import Path
 import uuid
 
@@ -29,15 +28,6 @@ def preview(doc_json: dict):
     """
     return render_html(doc_json)
 
-
-@app.post("/command")
-def command(data: dict):
-    doc = data["doc"]
-    command = data["command"]
-
-    updated = process_command(doc, command)
-
-    return updated
 
 
 @app.post("/generate-hwpx")
