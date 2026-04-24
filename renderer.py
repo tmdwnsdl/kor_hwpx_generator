@@ -81,27 +81,47 @@ def render_html(doc_json: dict) -> str:
       margin: 2px 0 3px 8px;
     }
 
-    /* 표 */
+    /* 표 — 맑은고딕 12pt, 좌우 테두리 없음 */
     .doc-table {
       width: auto;
       min-width: 50%;
       border-collapse: collapse;
       margin: 8px 0 14px;
-      font-size: 14px;
-      font-family: 'NanumMyeongjo', '휴먼명조', 'Batang', serif;
+      font-size: 12pt;
+      font-family: 'Malgun Gothic', '맑은고딕', sans-serif;
       table-layout: auto;
+      border-left: none;
+      border-right: none;
+      border-top: 0.3mm solid #000;
+      border-bottom: 0.3mm solid #000;
     }
-    .doc-table th, .doc-table td {
-      border: 1px solid #444;
-      padding: 6px 14px;
+    .doc-table th {
+      background: #F2F2F2;
+      font-weight: 700;
+      padding: 5px 14px;
       vertical-align: middle;
       text-align: center;
       line-height: 1.5;
       white-space: nowrap;
+      border-left: none;
+      border-right: none;
+      border-top: 0.3mm solid #000;
+      border-bottom: 2px double #000;  /* 이중 실선 */
     }
-    .doc-table th {
-      background: #f0f0f0;
-      font-weight: 700;
+    .doc-table td {
+      padding: 5px 14px;
+      vertical-align: middle;
+      text-align: center;
+      line-height: 1.5;
+      white-space: nowrap;
+      border-left: none;
+      border-right: none;
+      border-top: 0.12mm solid #000;
+      border-bottom: 0.12mm solid #000;
+    }
+    /* 마지막 행 bottom 0.3mm */
+    .doc-table tr:last-child td {
+      border-bottom: 0.3mm solid #000;
     }
   </style>
 </head>

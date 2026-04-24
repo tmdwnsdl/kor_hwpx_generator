@@ -6,10 +6,19 @@ from pathlib import Path
 from xml.sax.saxutils import escape as xml_escape
 
 # charPr IDs (base_new.hwpx 기준)
-_CHAR_HEADING = "10"   # HY헤드라인M 16pt
-_CHAR_BODY    = "11"   # 휴먼명조 15pt
-_CHAR_BOLD    = "14"   # 휴먼명조 15pt bold
-_CHAR_REF     = "13"   # 한양중고딕 13pt (참고내용 *)
+_CHAR_HEADING    = "10"   # HY헤드라인M 16pt
+_CHAR_BODY       = "11"   # 휴먼명조 15pt
+_CHAR_BOLD       = "14"   # 휴먼명조 15pt bold
+_CHAR_REF        = "13"   # 한양중고딕 13pt (참고내용 *)
+_CHAR_TABLE_BODY = "15"   # 맑은고딕 12pt (표 본문)
+_CHAR_TABLE_BOLD = "16"   # 맑은고딕 12pt bold (표 목차행)
+
+# borderFill IDs (표 전용)
+_BF_TABLE_FRAME  = "1"    # 테이블 외곽 프레임 (테두리 없음)
+_BF_HDR_MULTI    = "7"    # 목차행 멀티로우: top 0.3mm, bottom 이중 0.12mm, 배경 #F2F2F2
+_BF_HDR_SINGLE   = "8"    # 목차행 싱글로우: top/bottom 0.3mm, 배경 #F2F2F2
+_BF_DATA_MID     = "9"    # 중간 데이터 행: top/bottom 0.12mm
+_BF_DATA_LAST    = "10"   # 마지막 데이터 행: top 0.12mm, bottom 0.3mm
 
 
 def _runs_from_text(text: str, base_char: str = _CHAR_BODY) -> str:
@@ -66,18 +75,24 @@ def _calc_col_widths(headers: list, rows: list) -> list[int]:
 # ── 표 XML 생성 ────────────────────────────────────────────────────────────────
 def _build_table_xml(headers: list, rows: list, table_id: int) -> str:
     col_count = max(len(headers), 1)
-    row_count = len(rows) + 1
+    row_count = len(rows) + 1   # 헤더 1행 + 데이터 행
     col_widths = _calc_col_widths(headers, rows)
+    is_single_row = (len(rows) == 0)  # 헤더만 있는 경우
 
     def cell_width(col_idx: int) -> int:
         return col_widths[col_idx] if col_idx < len(col_widths) else _TABLE_WIDTH // col_count
 
+    def data_bf(ri: int) -> str:
+        """데이터 행 borderFill ID: 마지막 행은 bottom 0.3mm, 나머지는 0.12mm"""
+        return _BF_DATA_LAST if ri == len(rows) - 1 else _BF_DATA_MID
+
+    # 테이블 외곽: 프레임 테두리 없음 (각 셀이 직접 관리)
     tbl = (
         f'<hp:p id="0" paraPrIDRef="1" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
-        f'<hp:run charPrIDRef="23">'
+        f'<hp:run charPrIDRef="{_CHAR_TABLE_BODY}">'
         f'<hp:tbl id="{table_id}" zOrder="0" numberingType="TABLE" textWrap="TOP_AND_BOTTOM" '
         f'textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" pageBreak="CELL" repeatHeader="1" '
-        f'rowCnt="{row_count}" colCnt="{col_count}" cellSpacing="0" borderFillIDRef="3" noAdjust="0">'
+        f'rowCnt="{row_count}" colCnt="{col_count}" cellSpacing="0" borderFillIDRef="{_BF_TABLE_FRAME}" noAdjust="0">'
         f'<hp:sz width="{_TABLE_WIDTH}" widthRelTo="ABSOLUTE" '
         f'height="{_CELL_HEIGHT * row_count}" heightRelTo="ABSOLUTE" protect="0"/>'
         f'<hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="0" '
@@ -87,58 +102,16 @@ def _build_table_xml(headers: list, rows: list, table_id: int) -> str:
         f'<hp:inMargin left="565" right="565" top="0" bottom="0"/>'
     )
 
-    for ci, h in enumerate(headers):
-        tbl += (
-            f'<hp:tr><hp:tc name="" header="0" hasMargin="0" protect="0" editable="0" dirty="0" borderFillIDRef="3">'
-            f'<hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="CENTER" '
-            f'linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">'
-            f'<hp:p id="0" paraPrIDRef="2" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
-            f'<hp:run charPrIDRef="23"><hp:t>{xml_escape(str(h))}</hp:t></hp:run>'
-            f'<hp:linesegarray/></hp:p></hp:subList>'
-            f'<hp:cellAddr colAddr="{ci}" rowAddr="0"/>'
-            f'<hp:cellSpan colSpan="1" rowSpan="1"/>'
-            f'<hp:cellSz width="{cell_width(ci)}" height="{_CELL_HEIGHT}"/>'
-            f'<hp:cellMargin left="140" right="140" top="140" bottom="140"/></hp:tc></hp:tr>'
-        ) if ci == 0 else (
-            tbl + (
-                f'<hp:tc name="" header="0" hasMargin="0" protect="0" editable="0" dirty="0" borderFillIDRef="3">'
-                f'<hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="CENTER" '
-                f'linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">'
-                f'<hp:p id="0" paraPrIDRef="2" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
-                f'<hp:run charPrIDRef="23"><hp:t>{xml_escape(str(h))}</hp:t></hp:run>'
-                f'<hp:linesegarray/></hp:p></hp:subList>'
-                f'<hp:cellAddr colAddr="{ci}" rowAddr="0"/>'
-                f'<hp:cellSpan colSpan="1" rowSpan="1"/>'
-                f'<hp:cellSz width="{cell_width(ci)}" height="{_CELL_HEIGHT}"/>'
-                f'<hp:cellMargin left="140" right="140" top="140" bottom="140"/></hp:tc>'
-            )
-        )
-
-    # 헤더 행 재작성 (위 로직이 복잡하므로 단순화)
-    tbl = (
-        f'<hp:p id="0" paraPrIDRef="1" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
-        f'<hp:run charPrIDRef="{_CHAR_BODY}">'
-        f'<hp:tbl id="{table_id}" zOrder="0" numberingType="TABLE" textWrap="TOP_AND_BOTTOM" '
-        f'textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" pageBreak="CELL" repeatHeader="1" '
-        f'rowCnt="{row_count}" colCnt="{col_count}" cellSpacing="0" borderFillIDRef="3" noAdjust="0">'
-        f'<hp:sz width="{_TABLE_WIDTH}" widthRelTo="ABSOLUTE" '
-        f'height="{_CELL_HEIGHT * row_count}" heightRelTo="ABSOLUTE" protect="0"/>'
-        f'<hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="0" '
-        f'holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="COLUMN" vertAlign="TOP" '
-        f'horzAlign="LEFT" vertOffset="0" horzOffset="0"/>'
-        f'<hp:outMargin left="285" right="285" top="285" bottom="285"/>'
-        f'<hp:inMargin left="565" right="565" top="0" bottom="0"/>'
-    )
-
-    # 헤더 행 (paraPrIDRef="1": 번호 없는 스타일)
+    # 목차행(헤더): 싱글로우면 id=8, 멀티로우면 id=7
+    hdr_bf = _BF_HDR_SINGLE if is_single_row else _BF_HDR_MULTI
     tbl += '<hp:tr>'
     for ci, h in enumerate(headers):
         tbl += (
-            f'<hp:tc name="" header="0" hasMargin="0" protect="0" editable="0" dirty="0" borderFillIDRef="3">'
+            f'<hp:tc name="" header="0" hasMargin="0" protect="0" editable="0" dirty="0" borderFillIDRef="{hdr_bf}">'
             f'<hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="CENTER" '
             f'linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">'
             f'<hp:p id="0" paraPrIDRef="1" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
-            f'<hp:run charPrIDRef="{_CHAR_BOLD}"><hp:t>{xml_escape(str(h))}</hp:t></hp:run>'
+            f'<hp:run charPrIDRef="{_CHAR_TABLE_BOLD}"><hp:t>{xml_escape(str(h))}</hp:t></hp:run>'
             f'<hp:linesegarray/></hp:p></hp:subList>'
             f'<hp:cellAddr colAddr="{ci}" rowAddr="0"/>'
             f'<hp:cellSpan colSpan="1" rowSpan="1"/>'
@@ -147,17 +120,18 @@ def _build_table_xml(headers: list, rows: list, table_id: int) -> str:
         )
     tbl += '</hp:tr>'
 
-    # 데이터 행 (paraPrIDRef="1": 번호 없는 스타일)
+    # 데이터 행
     for ri, row in enumerate(rows):
+        bf = data_bf(ri)
         tbl += '<hp:tr>'
         for ci in range(col_count):
             cell_text = str(row[ci]) if ci < len(row) else ""
             tbl += (
-                f'<hp:tc name="" header="0" hasMargin="0" protect="0" editable="0" dirty="0" borderFillIDRef="3">'
+                f'<hp:tc name="" header="0" hasMargin="0" protect="0" editable="0" dirty="0" borderFillIDRef="{bf}">'
                 f'<hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="CENTER" '
                 f'linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">'
                 f'<hp:p id="0" paraPrIDRef="1" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
-                f'<hp:run charPrIDRef="{_CHAR_BODY}"><hp:t>{xml_escape(cell_text)}</hp:t></hp:run>'
+                f'<hp:run charPrIDRef="{_CHAR_TABLE_BODY}"><hp:t>{xml_escape(cell_text)}</hp:t></hp:run>'
                 f'<hp:linesegarray/></hp:p></hp:subList>'
                 f'<hp:cellAddr colAddr="{ci}" rowAddr="{ri + 1}"/>'
                 f'<hp:cellSpan colSpan="1" rowSpan="1"/>'
