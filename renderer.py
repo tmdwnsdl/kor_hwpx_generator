@@ -81,7 +81,7 @@ def render_html(doc_json: dict) -> str:
       margin: 2px 0 3px 8px;
     }
 
-    /* 표 — 맑은고딕 12pt, 좌우 테두리 없음 */
+    /* 표 — 맑은고딕 12pt */
     .doc-table {
       width: auto;
       min-width: 50%;
@@ -90,38 +90,41 @@ def render_html(doc_json: dict) -> str:
       font-size: 12pt;
       font-family: 'Malgun Gothic', '맑은고딕', sans-serif;
       table-layout: auto;
-      border-left: none;
-      border-right: none;
-      border-top: 0.3mm solid #000;
-      border-bottom: 0.3mm solid #000;
     }
+    .doc-table th, .doc-table td {
+      padding: 5px 14px;
+      vertical-align: middle;
+      text-align: center;
+      line-height: 1.5;
+      white-space: nowrap;
+    }
+    /* 목차행 */
     .doc-table th {
       background: #F2F2F2;
       font-weight: 700;
-      padding: 5px 14px;
-      vertical-align: middle;
-      text-align: center;
-      line-height: 1.5;
-      white-space: nowrap;
-      border-left: none;
-      border-right: none;
       border-top: 0.3mm solid #000;
-      border-bottom: 2px double #000;  /* 이중 실선 */
+      border-bottom: 2px double #000;
+      border-left: 0.12mm solid #000;
+      border-right: 0.12mm solid #000;
     }
+    /* 데이터행 */
     .doc-table td {
-      padding: 5px 14px;
-      vertical-align: middle;
-      text-align: center;
-      line-height: 1.5;
-      white-space: nowrap;
-      border-left: none;
-      border-right: none;
       border-top: 0.12mm solid #000;
       border-bottom: 0.12mm solid #000;
+      border-left: 0.12mm solid #000;
+      border-right: 0.12mm solid #000;
     }
     /* 마지막 행 bottom 0.3mm */
     .doc-table tr:last-child td {
       border-bottom: 0.3mm solid #000;
+    }
+    /* 첫 번째 열 — 외곽 좌측 테두리 없음 */
+    .doc-table th:first-child, .doc-table td:first-child {
+      border-left: none;
+    }
+    /* 마지막 열 — 외곽 우측 테두리 없음 */
+    .doc-table th:last-child, .doc-table td:last-child {
+      border-right: none;
     }
   </style>
 </head>

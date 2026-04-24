@@ -13,12 +13,18 @@ _CHAR_REF        = "13"   # 한양중고딕 13pt (참고내용 *)
 _CHAR_TABLE_BODY = "15"   # 맑은고딕 12pt (표 본문)
 _CHAR_TABLE_BOLD = "16"   # 맑은고딕 12pt bold (표 목차행)
 
-# borderFill IDs (표 전용)
-_BF_TABLE_FRAME  = "1"    # 테이블 외곽 프레임 (테두리 없음)
-_BF_HDR_MULTI    = "7"    # 목차행 멀티로우: top 0.3mm, bottom 이중 0.12mm, 배경 #F2F2F2
-_BF_HDR_SINGLE   = "8"    # 목차행 싱글로우: top/bottom 0.3mm, 배경 #F2F2F2
-_BF_DATA_MID     = "9"    # 중간 데이터 행: top/bottom 0.12mm
-_BF_DATA_LAST    = "10"   # 마지막 데이터 행: top 0.12mm, bottom 0.3mm
+# borderFill IDs (표 전용) — 행 유형 × 열 위치 조합
+# 비마지막열: right=0.12mm SOLID (내부 세로선 유지)
+# 마지막열:   right=NONE (외곽 우측 테두리 없음)
+_BF_TABLE_FRAME    = "6"   # 테이블 프레임 (테두리 없음)
+_BF_HDR_MULTI_NL   = "7"   # 목차행 멀티, 비마지막열: T=0.3mm, B=이중 0.12mm, fill
+_BF_HDR_MULTI_L    = "8"   # 목차행 멀티, 마지막열:   T=0.3mm, B=이중 0.12mm, fill
+_BF_HDR_SINGLE_NL  = "9"   # 목차행 싱글, 비마지막열: T=0.3mm, B=0.3mm, fill
+_BF_HDR_SINGLE_L   = "10"  # 목차행 싱글, 마지막열:   T=0.3mm, B=0.3mm, fill
+_BF_MID_NL         = "11"  # 중간행, 비마지막열: T/B=0.12mm
+_BF_MID_L          = "12"  # 중간행, 마지막열:   T/B=0.12mm
+_BF_LAST_NL        = "13"  # 마지막행, 비마지막열: T=0.12mm, B=0.3mm
+_BF_LAST_L         = "14"  # 마지막행, 마지막열:   T=0.12mm, B=0.3mm
 
 
 def _runs_from_text(text: str, base_char: str = _CHAR_BODY) -> str:
@@ -82,11 +88,24 @@ def _build_table_xml(headers: list, rows: list, table_id: int) -> str:
     def cell_width(col_idx: int) -> int:
         return col_widths[col_idx] if col_idx < len(col_widths) else _TABLE_WIDTH // col_count
 
-    def data_bf(ri: int) -> str:
-        """데이터 행 borderFill ID: 마지막 행은 bottom 0.3mm, 나머지는 0.12mm"""
-        return _BF_DATA_LAST if ri == len(rows) - 1 else _BF_DATA_MID
+    def hdr_bf(ci: int) -> str:
+        """목차행 borderFill: 싱글/멀티 × 비마지막열/마지막열"""
+        is_last = (ci == col_count - 1)
+        if is_single_row:
+            return _BF_HDR_SINGLE_L if is_last else _BF_HDR_SINGLE_NL
+        else:
+            return _BF_HDR_MULTI_L if is_last else _BF_HDR_MULTI_NL
 
-    # 테이블 외곽: 프레임 테두리 없음 (각 셀이 직접 관리)
+    def data_bf(ri: int, ci: int) -> str:
+        """데이터행 borderFill: 마지막행/중간행 × 비마지막열/마지막열"""
+        is_last_row = (ri == len(rows) - 1)
+        is_last_col = (ci == col_count - 1)
+        if is_last_row:
+            return _BF_LAST_L if is_last_col else _BF_LAST_NL
+        else:
+            return _BF_MID_L if is_last_col else _BF_MID_NL
+
+    # 테이블 외곽 프레임
     tbl = (
         f'<hp:p id="0" paraPrIDRef="1" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
         f'<hp:run charPrIDRef="{_CHAR_TABLE_BODY}">'
@@ -102,12 +121,11 @@ def _build_table_xml(headers: list, rows: list, table_id: int) -> str:
         f'<hp:inMargin left="565" right="565" top="0" bottom="0"/>'
     )
 
-    # 목차행(헤더): 싱글로우면 id=8, 멀티로우면 id=7
-    hdr_bf = _BF_HDR_SINGLE if is_single_row else _BF_HDR_MULTI
+    # 목차행 (헤더)
     tbl += '<hp:tr>'
     for ci, h in enumerate(headers):
         tbl += (
-            f'<hp:tc name="" header="0" hasMargin="0" protect="0" editable="0" dirty="0" borderFillIDRef="{hdr_bf}">'
+            f'<hp:tc name="" header="0" hasMargin="0" protect="0" editable="0" dirty="0" borderFillIDRef="{hdr_bf(ci)}">'
             f'<hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="CENTER" '
             f'linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">'
             f'<hp:p id="0" paraPrIDRef="1" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
@@ -122,12 +140,11 @@ def _build_table_xml(headers: list, rows: list, table_id: int) -> str:
 
     # 데이터 행
     for ri, row in enumerate(rows):
-        bf = data_bf(ri)
         tbl += '<hp:tr>'
         for ci in range(col_count):
             cell_text = str(row[ci]) if ci < len(row) else ""
             tbl += (
-                f'<hp:tc name="" header="0" hasMargin="0" protect="0" editable="0" dirty="0" borderFillIDRef="{bf}">'
+                f'<hp:tc name="" header="0" hasMargin="0" protect="0" editable="0" dirty="0" borderFillIDRef="{data_bf(ri, ci)}">'
                 f'<hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="CENTER" '
                 f'linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">'
                 f'<hp:p id="0" paraPrIDRef="1" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
