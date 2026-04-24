@@ -53,9 +53,9 @@ BASE_DIR = Path(__file__).resolve().parent
 TEMPLATE_PATH = BASE_DIR / "templates" / "base_new.hwpx"
 OUTPUT_DIR = BASE_DIR / "storage" / "hwpx"
 
-# 페이지 텍스트 영역 너비: 59528(A4) - 6519(좌) - 6519(우) - 285(표 좌마진) - 285(표 우마진) = 45920
-# → 표가 항상 텍스트 영역 전체를 꽉 채움
-_TABLE_WIDTH  = 45920
+# 컬럼 너비(46488) - paraPr id=1 왼쪽여백(3000) - outMargin 양쪽(283×2) = 42922
+# → 단락 들여쓰기 시작점에서 우측 여백까지 꽉 채움
+_TABLE_WIDTH  = 42922
 _CELL_HEIGHT  = 1800
 _COL_MIN_WIDTH = 2000   # 최소 열 너비 (열이 많아도 찌그러지지 않게 최소 보장)
 
@@ -136,9 +136,9 @@ def _build_table_xml(headers: list, rows: list, table_id: int) -> str:
         f'<hp:sz width="{_TABLE_WIDTH}" widthRelTo="ABSOLUTE" '
         f'height="{_CELL_HEIGHT * row_count}" heightRelTo="ABSOLUTE" protect="0"/>'
         f'<hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="0" '
-        f'holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="COLUMN" vertAlign="TOP" '
+        f'holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" '
         f'horzAlign="LEFT" vertOffset="0" horzOffset="0"/>'
-        f'<hp:outMargin left="285" right="285" top="285" bottom="285"/>'
+        f'<hp:outMargin left="283" right="283" top="283" bottom="283"/>'
         f'<hp:inMargin left="565" right="565" top="0" bottom="0"/>'
     )
 
