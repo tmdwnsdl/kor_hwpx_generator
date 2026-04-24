@@ -53,9 +53,11 @@ BASE_DIR = Path(__file__).resolve().parent
 TEMPLATE_PATH = BASE_DIR / "templates" / "base_new.hwpx"
 OUTPUT_DIR = BASE_DIR / "storage" / "hwpx"
 
-_TABLE_WIDTH = 47620
-_CELL_HEIGHT = 1800
-_COL_MIN_WIDTH = 4000   # 최소 열 너비
+# 페이지 텍스트 영역 너비: 59528(A4) - 6519(좌) - 6519(우) - 285(표 좌마진) - 285(표 우마진) = 45920
+# → 표가 항상 텍스트 영역 전체를 꽉 채움
+_TABLE_WIDTH  = 45920
+_CELL_HEIGHT  = 1800
+_COL_MIN_WIDTH = 2000   # 최소 열 너비 (열이 많아도 찌그러지지 않게 최소 보장)
 
 
 def _calc_col_widths(headers: list, rows: list) -> list[int]:
