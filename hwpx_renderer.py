@@ -11,20 +11,30 @@ _CHAR_BODY       = "11"   # 휴먼명조 15pt
 _CHAR_BOLD       = "14"   # 휴먼명조 15pt bold
 _CHAR_REF        = "13"   # 한양중고딕 13pt (참고내용 *)
 _CHAR_TABLE_BODY = "15"   # 맑은고딕 12pt (표 본문)
-_CHAR_TABLE_BOLD = "16"   # 맑은고딕 12pt bold (표 목차행)
+_CHAR_TABLE_BOLD = "16"   # 맑은고딕 12pt bold (표 목차행, <hh:bold/> 태그 방식)
 
 # borderFill IDs (표 전용) — 행 유형 × 열 위치 조합
-# 비마지막열: right=0.12mm SOLID (내부 세로선 유지)
-# 마지막열:   right=NONE (외곽 우측 테두리 없음)
-_BF_TABLE_FRAME    = "6"   # 테이블 프레임 (테두리 없음)
-_BF_HDR_MULTI_NL   = "7"   # 목차행 멀티, 비마지막열: T=0.3mm, B=이중 0.12mm, fill
-_BF_HDR_MULTI_L    = "8"   # 목차행 멀티, 마지막열:   T=0.3mm, B=이중 0.12mm, fill
-_BF_HDR_SINGLE_NL  = "9"   # 목차행 싱글, 비마지막열: T=0.3mm, B=0.3mm, fill
-_BF_HDR_SINGLE_L   = "10"  # 목차행 싱글, 마지막열:   T=0.3mm, B=0.3mm, fill
-_BF_MID_NL         = "11"  # 중간행, 비마지막열: T/B=0.12mm
-_BF_MID_L          = "12"  # 중간행, 마지막열:   T/B=0.12mm
-_BF_LAST_NL        = "13"  # 마지막행, 비마지막열: T=0.12mm, B=0.3mm
-_BF_LAST_L         = "14"  # 마지막행, 마지막열:   T=0.12mm, B=0.3mm
+# 비마지막열: L=NONE, R=0.12mm SOLID (내부 세로선)
+# 마지막열:   L=0.12mm SOLID, R=NONE (외곽 우측 없음)
+_BF_TABLE_FRAME    = "5"   # 테이블 외곽 프레임 (전체 NONE, 기존 템플릿 id=5)
+# 목차행 (다중행 테이블): B=DOUBLE_SLIM 0.7mm
+_BF_HDR_NL         = "6"   # 목차행, 비마지막열: L=NONE R=0.12 T=0.3 B=DS fill
+_BF_HDR_L          = "7"   # 목차행, 마지막열:   L=0.12 R=NONE T=0.3 B=DS fill
+# 목차행 바로 아래 첫번째 데이터행: T=DOUBLE_SLIM (헤더와 맞닿는 쪽)
+_BF_FIRST_NL       = "8"   # 1st-data, 비마지막열: L=NONE R=0.12 T=DS B=0.12
+_BF_FIRST_L        = "9"   # 1st-data, 마지막열:   L=0.12 R=NONE T=DS B=0.12
+# 중간 데이터행 (2번째 ~ 끝에서 두번째)
+_BF_MID_NL         = "10"  # mid, 비마지막열: T/B=0.12
+_BF_MID_L          = "11"  # mid, 마지막열:   T/B=0.12
+# 마지막 데이터행 (2개 이상 데이터행일 때)
+_BF_LAST_NL        = "12"  # last, 비마지막열: T=0.12 B=0.3
+_BF_LAST_L         = "13"  # last, 마지막열:   T=0.12 B=0.3
+# 데이터행이 1개뿐 (첫번째 = 마지막): T=DS B=0.3
+_BF_ONLY_NL        = "14"  # only-data, 비마지막열: T=DS B=0.3
+_BF_ONLY_L         = "15"  # only-data, 마지막열:   T=DS B=0.3
+# 목차행만 있는 단일행 테이블: B=0.3mm (이중선 없음)
+_BF_HDR_ONLY_NL    = "16"  # HDR-only, 비마지막열: T=0.3 B=0.3 fill
+_BF_HDR_ONLY_L     = "17"  # HDR-only, 마지막열:   T=0.3 B=0.3 fill
 
 
 def _runs_from_text(text: str, base_char: str = _CHAR_BODY) -> str:
@@ -89,20 +99,29 @@ def _build_table_xml(headers: list, rows: list, table_id: int) -> str:
         return col_widths[col_idx] if col_idx < len(col_widths) else _TABLE_WIDTH // col_count
 
     def hdr_bf(ci: int) -> str:
-        """목차행 borderFill: 싱글/멀티 × 비마지막열/마지막열"""
+        """목차행 borderFill: 단일행/다중행 × 비마지막열/마지막열"""
         is_last = (ci == col_count - 1)
         if is_single_row:
-            return _BF_HDR_SINGLE_L if is_last else _BF_HDR_SINGLE_NL
+            return _BF_HDR_ONLY_L if is_last else _BF_HDR_ONLY_NL
         else:
-            return _BF_HDR_MULTI_L if is_last else _BF_HDR_MULTI_NL
+            return _BF_HDR_L if is_last else _BF_HDR_NL
 
     def data_bf(ri: int, ci: int) -> str:
-        """데이터행 borderFill: 마지막행/중간행 × 비마지막열/마지막열"""
-        is_last_row = (ri == len(rows) - 1)
-        is_last_col = (ci == col_count - 1)
-        if is_last_row:
+        """데이터행 borderFill: 행 위치 × 열 위치 조합
+        - 첫번째 행: T=DOUBLE_SLIM (목차행 이중선과 맞닿음)
+        - 마지막 행: B=0.3mm (외곽 하단)
+        - 데이터행 1개: 첫번째 & 마지막 (T=DS, B=0.3mm)
+        """
+        is_first_row = (ri == 0)
+        is_last_row  = (ri == len(rows) - 1)
+        is_last_col  = (ci == col_count - 1)
+        if is_first_row and is_last_row:    # 데이터행 1개
+            return _BF_ONLY_L if is_last_col else _BF_ONLY_NL
+        elif is_first_row:                  # 첫번째 (다중행)
+            return _BF_FIRST_L if is_last_col else _BF_FIRST_NL
+        elif is_last_row:                   # 마지막
             return _BF_LAST_L if is_last_col else _BF_LAST_NL
-        else:
+        else:                               # 중간
             return _BF_MID_L if is_last_col else _BF_MID_NL
 
     # 테이블 외곽 프레임
