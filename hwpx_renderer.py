@@ -13,6 +13,19 @@ _CHAR_REF        = "13"   # 한양중고딕 13pt (참고내용 *)
 _CHAR_TABLE_BODY = "15"   # 맑은고딕 12pt (표 본문)
 _CHAR_TABLE_BOLD = "16"   # 맑은고딕 12pt bold (표 목차행, <hh:bold/> 태그 방식)
 
+# 빈줄 간격용 charPr IDs (줄간격 조정 — 각 단락 앞 빈줄의 폰트 크기)
+_CHAR_SP_8PT = "17"   # 8pt: Ⅰ. 수준 앞
+_CHAR_SP_5PT = "18"   # 5pt: ㅁ 수준 앞
+_CHAR_SP_3PT = "19"   # 3pt: ㅇ 수준 앞
+_CHAR_SP_1PT = "20"   # 1pt: -, * 수준 앞
+
+# paraPr IDs — 단락 수준별 들여쓰기 (1칸=2000 HWPUNIT)
+_PARA_ROMAN  = "23"   # Ⅰ. 수준: left=0    (들여쓰기 없음)
+_PARA_SQUARE = "24"   # ㅁ 수준: left=2000 (1칸)
+_PARA_CIRCLE = "25"   # ㅇ 수준: left=4000 (2칸)
+_PARA_DASH   = "26"   # -  수준: left=6000 (3칸)
+_PARA_STAR   = "27"   # *  수준: left=8000 (4칸)
+
 # borderFill IDs (표 전용) — 행 유형 × 열 위치 조합
 # 비마지막열: L=NONE, R=0.12mm SOLID (내부 세로선)
 # 마지막열:   L=0.12mm SOLID, R=NONE (외곽 우측 없음)
@@ -37,6 +50,31 @@ _BF_HDR_ONLY_NL    = "16"  # HDR-only, 비마지막열: T=0.3 B=0.3 fill
 _BF_HDR_ONLY_L     = "17"  # HDR-only, 마지막열:   T=0.3 B=0.3 fill
 
 
+def _detect_level(line: str) -> tuple:
+    """줄 첫 기호로 단락 수준 감지 → (paraPrIDRef, spacer_charPr, base_charPr)"""
+    s = line.lstrip()
+    if re.match(r'^[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩⅰⅱⅲⅳⅴ]', s):
+        return _PARA_ROMAN,  _CHAR_SP_8PT, _CHAR_HEADING
+    if s.startswith(('□', 'ㅁ')):
+        return _PARA_SQUARE, _CHAR_SP_5PT, _CHAR_BODY
+    if s.startswith(('○', '◦', 'ㅇ')):
+        return _PARA_CIRCLE, _CHAR_SP_3PT, _CHAR_BODY
+    if s.startswith('-'):
+        return _PARA_DASH,   _CHAR_SP_1PT, _CHAR_BODY
+    if s.startswith(('*', '※')):
+        return _PARA_STAR,   _CHAR_SP_1PT, _CHAR_REF
+    return _PARA_SQUARE, _CHAR_SP_5PT, _CHAR_BODY   # 기본값 → ㅁ 수준
+
+
+def _spacer(char_pr: str) -> str:
+    """지정 폰트 크기의 빈줄 단락 XML (단락 앞 줄간격 역할)"""
+    return (
+        f'<hp:p id="0" paraPrIDRef="0" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
+        f'<hp:run charPrIDRef="{char_pr}"/>'
+        f'<hp:linesegarray/></hp:p>'
+    )
+
+
 def _runs_from_text(text: str, base_char: str = _CHAR_BODY) -> str:
     """**text** 마크다운을 bold run과 normal run으로 분리하여 HWPX run XML 생성"""
     parts = re.split(r'(\*\*.*?\*\*)', text)
@@ -53,9 +91,9 @@ BASE_DIR = Path(__file__).resolve().parent
 TEMPLATE_PATH = BASE_DIR / "templates" / "base_new.hwpx"
 OUTPUT_DIR = BASE_DIR / "storage" / "hwpx"
 
-# 컬럼 너비(46488) - paraPr id=1 왼쪽여백(3000) - outMargin 양쪽(283×2) = 42922
-# → 단락 들여쓰기 시작점에서 우측 여백까지 꽉 채움
-_TABLE_WIDTH  = 42922
+# 컬럼 너비(46488) - paraPr ㅁ수준 왼쪽여백(2000) - outMargin 양쪽(283×2) = 43922
+# → ㅁ 수준(1칸) 들여쓰기 시작점에서 우측 여백까지 꽉 채움
+_TABLE_WIDTH  = 43922
 _CELL_HEIGHT  = 1800
 _COL_MIN_WIDTH = 2000   # 최소 열 너비 (열이 많아도 찌그러지지 않게 최소 보장)
 
@@ -126,9 +164,9 @@ def _build_table_xml(headers: list, rows: list, table_id: int) -> str:
         else:                               # 중간
             return _BF_MID_L if is_last_col else _BF_MID_NL
 
-    # 테이블 외곽 프레임
+    # 테이블 외곽 프레임 (ㅁ 수준 들여쓰기 적용)
     tbl = (
-        f'<hp:p id="0" paraPrIDRef="1" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
+        f'<hp:p id="0" paraPrIDRef="{_PARA_SQUARE}" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
         f'<hp:run charPrIDRef="{_CHAR_TABLE_BODY}">'
         f'<hp:tbl id="{table_id}" zOrder="0" numberingType="TABLE" textWrap="TOP_AND_BOTTOM" '
         f'textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" pageBreak="CELL" repeatHeader="1" '
@@ -184,39 +222,39 @@ def _build_table_xml(headers: list, rows: list, table_id: int) -> str:
 
 # ── 섹션 XML 생성 ──────────────────────────────────────────────────────────────
 def _build_section_xml(title: str, body_parts: list, tables: list, tbl_counter: list) -> str:
-    """섹션 제목 + 본문 단락들 + 표들 XML 생성"""
+    """섹션 제목 + 본문 단락들 + 표들 XML 생성
+    줄간격: 각 단락 앞에 빈줄(8/5/3/1pt) 삽입
+    들여쓰기: 기호 감지 후 paraPr로 레벨별 left margin 적용
+    """
     result = ""
 
-    # 섹션 제목 단락 (HY헤드라인M 16pt)
+    # ① 섹션 제목 (Ⅰ. 수준) — 8pt 빈줄 + 헤딩 단락
+    result += _spacer(_CHAR_SP_8PT)
     result += (
-        f'<hp:p id="0" paraPrIDRef="1" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
+        f'<hp:p id="0" paraPrIDRef="{_PARA_ROMAN}" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
         f'<hp:run charPrIDRef="{_CHAR_HEADING}"><hp:t>{xml_escape(title)}</hp:t></hp:run>'
         f'<hp:linesegarray/></hp:p>'
     )
 
-    # 본문 단락들 (줄 단위로 분리, * 참고내용 처리, **볼드** 처리)
+    # ② 본문 단락들 — 기호 감지 → 빈줄 삽입 + 레벨별 paraPr + charPr
     for body_text in body_parts:
         for line in body_text.split("\n"):
             if not line.strip():
                 continue
-            base_char = _CHAR_REF if line.lstrip().startswith("*") else _CHAR_BODY
+            para_pr, spacer_cpr, base_char = _detect_level(line)
             runs = _runs_from_text(line, base_char)
+            result += _spacer(spacer_cpr)
             result += (
-                f'<hp:p id="0" paraPrIDRef="1" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
+                f'<hp:p id="0" paraPrIDRef="{para_pr}" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
                 f'{runs}'
                 f'<hp:linesegarray/></hp:p>'
             )
 
-    # 표들
+    # ③ 표들 — ㅁ 수준(5pt 빈줄) + paraPrIDRef=_PARA_SQUARE 적용
     for tbl in tables:
         tbl_counter[0] += 1
+        result += _spacer(_CHAR_SP_5PT)
         result += _build_table_xml(tbl.get("headers", []), tbl.get("rows", []), tbl_counter[0])
-
-    # 섹션 간 빈 줄
-    result += (
-        '<hp:p id="0" paraPrIDRef="1" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
-        '<hp:run charPrIDRef="1"/><hp:linesegarray/></hp:p>'
-    )
 
     return result
 
