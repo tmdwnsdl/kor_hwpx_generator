@@ -66,7 +66,7 @@ def _detect_level(line: str) -> tuple:
         return _INDENT["roman"],  _CHAR_SP_8PT, _CHAR_HEADING
     if s.startswith(('□', 'ㅁ')):
         return _INDENT["square"], _CHAR_SP_5PT, _CHAR_BODY
-    if s.startswith(('○', '◦', 'ㅇ')):
+    if s.startswith(('◦', '○', 'ㅇ')):   # ◦ = U+25E6 (기본), ○/ㅇ 호환
         return _INDENT["circle"], _CHAR_SP_3PT, _CHAR_BODY
     if s.startswith('-'):
         return _INDENT["dash"],   _CHAR_SP_1PT, _CHAR_BODY
