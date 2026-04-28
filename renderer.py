@@ -7,6 +7,24 @@ def _apply_bold(text: str) -> str:
     return re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
 
 
+# 줄 첫 기호 → (margin-top, margin-left, is_ref)
+# margin-top: HWPX 빈줄 spacer 크기에 대응 (8/5/3/1pt)
+# margin-left: HWPX 스페이스 1/2/3/4칸에 대응
+def _line_style(line: str) -> tuple:
+    s = line.lstrip()
+    if re.match(r'^[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩⅰⅱⅲⅳⅴ]', s):
+        return "8pt",  "0",    False
+    if s.startswith(('□', 'ㅁ')):
+        return "5pt",  "1ch",  False
+    if s.startswith(('◦', '○', 'ㅇ')):
+        return "3pt",  "2ch",  False
+    if s.startswith('-'):
+        return "1pt",  "3ch",  False
+    if s.startswith(('*', '※')):
+        return "1pt",  "4ch",  True
+    return "5pt", "1ch", False  # 기본값 → □ 수준
+
+
 def render_html(doc_json: dict) -> str:
     title = escape(doc_json.get("title", ""))
     blocks = doc_json.get("blocks", [])
@@ -26,7 +44,7 @@ def render_html(doc_json: dict) -> str:
       padding: 32px 16px;
     }
 
-    /* A4 용지 - 편집여백: 위아래15mm, 좌우23mm */
+    /* A4 용지 */
     .page {
       background: #fff;
       width: 100%;
@@ -37,7 +55,7 @@ def render_html(doc_json: dict) -> str:
       min-height: 600px;
     }
 
-    /* 제목 박스 - borderFill id=4: 위아래 #0099FF 2mm, 배경 그라디언트 */
+    /* 제목 박스 */
     .title-box {
       border-top: 3px solid #0099FF;
       border-bottom: 3px solid #0099FF;
@@ -54,39 +72,38 @@ def render_html(doc_json: dict) -> str:
       letter-spacing: 1px;
     }
 
-    /* 섹션 제목 - HY헤드라인M 16pt */
+    /* 섹션 제목 — HY헤드라인M 16pt, 앞 여백 8pt */
     .section-heading {
       font-family: 'HY헤드라인M', 'Malgun Gothic', sans-serif;
       font-size: 16px;
       font-weight: 700;
       color: #000;
-      margin: 20px 0 6px;
+      margin-top: 8pt;
+      margin-bottom: 0;
     }
 
-    /* 본문 - TH 휴먼명조 15pt, 줄간격 150~160% */
-    .body-text {
+    /* 본문 — 휴먼명조 15pt, 줄간격 160% */
+    .body-line {
       font-family: 'NanumMyeongjo', 'Nanum Myeongjo', '휴먼명조', 'Batang', serif;
       font-size: 15px;
       color: #111;
-      line-height: 1.55;
-      margin-bottom: 3px;
+      line-height: 1.6;
     }
 
-    /* 참고내용 - 중고딕 13pt, * 표시 */
-    .ref-text {
+    /* 참고내용 — 한양중고딕 13pt */
+    .ref-line {
       font-family: 'Malgun Gothic', sans-serif;
       font-size: 13px;
       color: #333;
-      line-height: 1.5;
-      margin: 2px 0 3px 8px;
+      line-height: 1.55;
     }
 
-    /* 표 — 맑은고딕 12pt */
+    /* 표 — 맑은고딕 12pt, margin-left 1칸(1ch) */
     .doc-table {
-      width: auto;
-      min-width: 50%;
       border-collapse: collapse;
-      margin: 8px 0 14px;
+      margin-left: 1ch;
+      margin-right: 0;
+      width: calc(100% - 1ch);
       font-size: 12pt;
       font-family: 'Malgun Gothic', '맑은고딕', sans-serif;
       table-layout: auto;
@@ -98,34 +115,22 @@ def render_html(doc_json: dict) -> str:
       line-height: 1.5;
       white-space: nowrap;
     }
-    /* 목차행 */
+    /* 목차행 — 배경 #F2F2F2, 상단 0.3mm, 하단 이중선, 내부 세로 0.12mm */
     .doc-table th {
       background: #F2F2F2;
       font-weight: 700;
       border-top: 0.3mm solid #000;
       border-bottom: 2px double #000;
-      border-left: 0.12mm solid #000;
-      border-right: 0.12mm solid #000;
     }
+    .doc-table th:not(:first-child) { border-left: 0.12mm solid #000; }
     /* 데이터행 */
     .doc-table td {
       border-top: 0.12mm solid #000;
       border-bottom: 0.12mm solid #000;
-      border-left: 0.12mm solid #000;
-      border-right: 0.12mm solid #000;
     }
-    /* 마지막 행 bottom 0.3mm */
-    .doc-table tr:last-child td {
-      border-bottom: 0.3mm solid #000;
-    }
-    /* 첫 번째 열 — 외곽 좌측 테두리 없음 */
-    .doc-table th:first-child, .doc-table td:first-child {
-      border-left: none;
-    }
-    /* 마지막 열 — 외곽 우측 테두리 없음 */
-    .doc-table th:last-child, .doc-table td:last-child {
-      border-right: none;
-    }
+    .doc-table td:not(:first-child) { border-left: 0.12mm solid #000; }
+    /* 마지막 행 하단 0.3mm */
+    .doc-table tr:last-child td { border-bottom: 0.3mm solid #000; }
   </style>
 </head>
 <body>
@@ -148,23 +153,26 @@ def render_html(doc_json: dict) -> str:
             raw = block.get("text", "")
             if raw:
                 for line in raw.split("\n"):
-                    rendered = _apply_bold(escape(line))
-                    if line.lstrip().startswith("*"):
-                        parts.append(f'  <div class="ref-text">{rendered}</div>\n')
-                    else:
-                        parts.append(f'  <div class="body-text">{rendered}</div>\n')
+                    if not line.strip():
+                        continue
+                    mt, ml, is_ref = _line_style(line)
+                    cls = "ref-line" if is_ref else "body-line"
+                    style = f'margin-top:{mt}; margin-left:{ml};'
+                    rendered = _apply_bold(escape(line.lstrip()))
+                    parts.append(f'  <div class="{cls}" style="{style}">{rendered}</div>\n')
 
         elif btype == "bullet_list":
             items = block.get("items", [])
-            parts.append('  <ul style="margin:6px 0 6px 20px; font-size:15px; line-height:1.55; font-family:\'NanumMyeongjo\',\'Batang\',serif;">\n')
             for item in items:
-                parts.append(f'    <li>{_apply_bold(escape(str(item)))}</li>\n')
-            parts.append('  </ul>\n')
+                mt, ml, is_ref = _line_style(str(item))
+                cls = "ref-line" if is_ref else "body-line"
+                style = f'margin-top:{mt}; margin-left:{ml};'
+                parts.append(f'  <div class="{cls}" style="{style}">{_apply_bold(escape(str(item)))}</div>\n')
 
         elif btype in ("table", "simple_table"):
             headers = block.get("headers", [])
             rows = block.get("rows", [])
-            parts.append('  <table class="doc-table">\n')
+            parts.append('  <table class="doc-table" style="margin-top:5pt;">\n')
             if headers:
                 parts.append('    <thead><tr>\n')
                 for h in headers:
