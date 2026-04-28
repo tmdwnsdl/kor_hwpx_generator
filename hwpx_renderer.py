@@ -23,14 +23,14 @@ _CHAR_SP_1PT = "20"   # 1pt: -, * 수준 앞
 _PARA_ROMAN  = "23"   # 모든 본문 단락 공통 (left=0) — 들여쓰기는 전각공백으로 처리
 _PARA_SQUARE = "24"   # 표 단락용 (left=2000, 1칸)
 
-# 전각공백(　, U+3000) 수준별 개수 — 조판부호에서 v 표시로 확인 가능
-_IDEOGRAPHIC_SPACE = "　"
+# 일반 스페이스(U+0020) 기반 들여쓰기 — 조판부호에서 v 표시 확인 가능
+# 전각 1칸 ≈ 반각 2칸이므로 수준별 스페이스 2개씩 증가
 _INDENT_SPACES = {
-    "roman":  0,   # Ⅰ.  → 공백 없음
-    "square": 1,   # □   → 　×1
-    "circle": 2,   # ◦   → 　×2
-    "dash":   3,   # -    → 　×3
-    "star":   4,   # *    → 　×4
+    "roman":  "",    # Ⅰ.  → 공백 없음
+    "square": "  ",  # □   → 스페이스 2개 (1칸)
+    "circle": "    ", # ◦  → 스페이스 4개 (2칸)
+    "dash":   "      ", # - → 스페이스 6개 (3칸)
+    "star":   "        ", # * → 스페이스 8개 (4칸)
 }
 
 # borderFill IDs (표 전용) — 행 유형 × 열 위치 조합
@@ -251,7 +251,7 @@ def _build_section_xml(title: str, body_parts: list, tables: list, tbl_counter: 
             if not line.strip():
                 continue
             indent_cnt, spacer_cpr, base_char = _detect_level(line)
-            indented = _IDEOGRAPHIC_SPACE * indent_cnt + line.lstrip()
+            indented = indent_cnt + line.lstrip()
             runs = _runs_from_text(indented, base_char)
             result += _spacer(spacer_cpr)
             result += (
