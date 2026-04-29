@@ -20,8 +20,12 @@ _CHAR_SP_3PT = "19"   # 3pt: ○ 수준 앞
 _CHAR_SP_1PT = "20"   # 1pt: -, * 수준 앞
 
 # paraPr IDs
-_PARA_ROMAN  = "23"   # 모든 본문 단락 공통 (left=0) — 들여쓰기는 전각공백으로 처리
-_PARA_SQUARE = "24"   # 표 단락용 (left=2000, 1칸)
+_PARA_ROMAN  = "23"   # Ⅰ. 수준 / 기본 (left=0, intent=0)
+_PARA_SQUARE = "24"   # 표 단락용 (left=2000, intent=0)
+# 수준별 hanging indent: left=X, intent=-X → 첫줄=0, 줄바꿈=X (텍스트 시작점 정렬)
+_PARA_HANG_SQ = "28"  # □ 수준 (left=3000, intent=-3000)
+_PARA_HANG_CI = "29"  # ◦/- 수준 (left=3750, intent=-3750)
+_PARA_HANG_ST = "30"  # * 수준  (left=4500, intent=-4500)
 
 # 일반 스페이스(U+0020) 기반 들여쓰기 — 조판부호에서 v 표시 확인 가능
 _INDENT_SPACES = {
@@ -57,21 +61,22 @@ _BF_HDR_ONLY_L     = "17"  # HDR-only, 마지막열:   T=0.3 B=0.3 fill
 
 
 def _detect_level(line: str) -> tuple:
-    """줄 첫 기호로 단락 수준 감지 → (indent_count, spacer_charPr, base_charPr)
-    indent_count: 텍스트 앞에 붙일 전각공백(　, U+3000) 개수
+    """줄 첫 기호로 단락 수준 감지
+    → (indent_str, spacer_charPr, base_charPr, para_pr_id)
+    para_pr_id: 줄바꿈 시 텍스트 시작점에 맞게 hanging indent 적용된 paraPr
     """
     s = line.lstrip()
     if re.match(r'^[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩⅰⅱⅲⅳⅴ]', s):
-        return _INDENT_SPACES["roman"],  _CHAR_SP_8PT, _CHAR_HEADING
+        return _INDENT_SPACES["roman"],  _CHAR_SP_8PT, _CHAR_HEADING, _PARA_ROMAN
     if s.startswith(('□', 'ㅁ')):
-        return _INDENT_SPACES["square"], _CHAR_SP_5PT, _CHAR_BODY
+        return _INDENT_SPACES["square"], _CHAR_SP_5PT, _CHAR_BODY,    _PARA_HANG_SQ
     if s.startswith(('◦', '○', 'ㅇ')):   # ◦ = U+25E6 (기본), ○/ㅇ 호환
-        return _INDENT_SPACES["circle"], _CHAR_SP_3PT, _CHAR_BODY
+        return _INDENT_SPACES["circle"], _CHAR_SP_3PT, _CHAR_BODY,    _PARA_HANG_CI
     if s.startswith('-'):
-        return _INDENT_SPACES["dash"],   _CHAR_SP_1PT, _CHAR_BODY
+        return _INDENT_SPACES["dash"],   _CHAR_SP_1PT, _CHAR_BODY,    _PARA_HANG_CI
     if s.startswith(('*', '※')):
-        return _INDENT_SPACES["star"],   _CHAR_SP_1PT, _CHAR_REF
-    return _INDENT_SPACES["square"], _CHAR_SP_5PT, _CHAR_BODY   # 기본값 → □ 수준
+        return _INDENT_SPACES["star"],   _CHAR_SP_1PT, _CHAR_REF,     _PARA_HANG_ST
+    return _INDENT_SPACES["square"], _CHAR_SP_5PT, _CHAR_BODY, _PARA_HANG_SQ   # 기본값 → □ 수준
 
 
 def _spacer(char_pr: str) -> str:
@@ -244,17 +249,17 @@ def _build_section_xml(title: str, body_parts: list, tables: list, tbl_counter: 
         f'<hp:linesegarray/></hp:p>'
     )
 
-    # ② 본문 단락들 — 기호 감지 → 빈줄 삽입 + 전각공백 prefix + charPr
+    # ② 본문 단락들 — 기호 감지 → 빈줄 삽입 + space prefix + charPr + hanging paraPr
     for body_text in body_parts:
         for line in body_text.split("\n"):
             if not line.strip():
                 continue
-            indent_cnt, spacer_cpr, base_char = _detect_level(line)
-            indented = indent_cnt + line.lstrip()
+            indent_str, spacer_cpr, base_char, para_pr = _detect_level(line)
+            indented = indent_str + line.lstrip()
             runs = _runs_from_text(indented, base_char)
             result += _spacer(spacer_cpr)
             result += (
-                f'<hp:p id="0" paraPrIDRef="{_PARA_ROMAN}" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
+                f'<hp:p id="0" paraPrIDRef="{para_pr}" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
                 f'{runs}'
                 f'<hp:linesegarray/></hp:p>'
             )
