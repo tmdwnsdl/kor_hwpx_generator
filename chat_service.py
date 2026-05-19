@@ -160,6 +160,13 @@ def _doc_to_blocks_json(doc: ReportDocument) -> dict:
                         "captions": block.get("captions", []),
                     }
                 )
+    # 목차 요청 시 맨 앞에 toc 블록 삽입 (항목 = 섹션 제목들)
+    if doc.meta.get("include_toc"):
+        entries = [
+            f"{i}. {section.heading}"
+            for i, section in enumerate(doc.sections, 1)
+        ]
+        blocks.insert(0, {"type": "toc", "entries": entries})
     return {"title": doc.title, "blocks": blocks}
 
 
@@ -327,6 +334,25 @@ TOOLS: List[dict] = [
     {
         "type": "function",
         "function": {
+            "name": "add_toc",
+            "description": (
+                "문서 맨 앞에 목차를 생성합니다. "
+                "사용자가 목차를 요청할 때만 호출하세요 (보통 문서가 10페이지 이상 길 때). "
+                "목차 항목은 현재 문서의 섹션 제목들로 자동 구성되며, "
+                "각 항목의 페이지 번호는 빈칸으로 두어 사용자가 한글에서 직접 기입합니다."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "document_id": {"type": "string"},
+                },
+                "required": ["document_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "get_document",
             "description": "현재 문서의 전체 내용을 조회합니다.",
             "parameters": {
@@ -456,6 +482,17 @@ def _execute_tool(name: str, inputs: dict) -> dict:
                 "updated_at": doc.updated_at,
             }
 
+        elif name == "add_toc":
+            doc = store.get(inputs["document_id"])
+            doc.meta["include_toc"] = True
+            store.save(doc)
+            return {
+                "document_id": inputs["document_id"],
+                "include_toc": True,
+                "section_count": len(doc.sections),
+                "updated_at": doc.updated_at,
+            }
+
         elif name == "get_document":
             doc = store.get(inputs["document_id"])
             return store.to_dict(doc)
@@ -514,6 +551,8 @@ STEP 4. 각 섹션 내용 작성
   - 표가 필요하면 add_simple_table 호출
   - 그림(사진)을 넣을 자리가 필요하면 add_image_table 호출
     (그림 파일은 사용자가 한글에서 직접 삽입하므로 빈 그림칸 + 캡션 표만 생성)
+  - 사용자가 목차를 요청하면 add_toc 호출 (보통 문서가 10페이지 이상 길 때)
+    ※ 목차는 사용자가 명시적으로 요청할 때만 생성하며, 임의로 만들지 않음
   - 사용자가 제공한 정보를 최우선으로 반영
   - 부족한 정보는 사용자에게 질문하여 보완
 

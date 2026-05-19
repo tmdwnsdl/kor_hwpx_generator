@@ -153,6 +153,31 @@ def render_html(doc_json: dict) -> str:
       background: #fafafa;
     }
     .img-table .img-cap { padding: 6px 8px; }
+
+    /* 목차 */
+    .toc-title {
+      text-align: center;
+      font-family: 'HY헤드라인M', 'Malgun Gothic', sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 8px;
+      margin: 8pt 0 16px;
+    }
+    .toc-entry {
+      display: flex;
+      align-items: baseline;
+      font-family: 'NanumMyeongjo', 'Nanum Myeongjo', '휴먼명조', serif;
+      font-size: 15px;
+      margin-top: 7px;
+    }
+    .toc-name { white-space: nowrap; }
+    .toc-dots {
+      flex: 1;
+      border-bottom: 2px dotted #999;
+      margin: 0 6px;
+      transform: translateY(-4px);
+    }
+    .toc-page { white-space: nowrap; min-width: 1.5em; text-align: right; }
   </style>
 </head>
 <body>
@@ -167,7 +192,18 @@ def render_html(doc_json: dict) -> str:
     for block in blocks:
         btype = block.get("type")
 
-        if btype == "heading":
+        if btype == "toc":
+            entries = block.get("entries", [])
+            parts.append('  <div class="toc-title">목 차</div>\n')
+            for e in entries:
+                parts.append(
+                    f'  <div class="toc-entry">'
+                    f'<span class="toc-name">{escape(str(e))}</span>'
+                    f'<span class="toc-dots"></span>'
+                    f'<span class="toc-page"></span></div>\n'
+                )
+
+        elif btype == "heading":
             text = _apply_bold(escape(block.get("text", "")))
             parts.append(f'  <div class="section-heading">{text}</div>\n')
 

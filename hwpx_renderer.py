@@ -38,6 +38,10 @@ _HANG_INTENT = {
     _PARA_HANG_STAR: -7692,
 }
 
+# 목차용 paraPr — 렌더 시점에 header.xml에 동적 주입 (paraPr 23 복제)
+_PARA_TOC_TITLE = "32"  # 목차 제목 "목 차" (가운데 정렬)
+_PARA_TOC_ENTRY = "33"  # 목차 항목 (우측 자동탭 — tabPrIDRef=2, 점선 leader)
+
 # 일반 스페이스(U+0020) 기반 들여쓰기 — 조판부호에서 v 표시 확인 가능
 _INDENT_SPACES = {
     "roman":  "",     # Ⅰ.  → 공백 없음
@@ -118,6 +122,35 @@ def _inject_hanging_parapr(header_xml: str) -> str:
     header_xml = re.sub(
         r'(<hh:paraProperties itemCnt=")(\d+)(")',
         lambda mm: f'{mm.group(1)}{int(mm.group(2)) + len(_HANG_INTENT)}{mm.group(3)}',
+        header_xml, count=1,
+    )
+    return header_xml
+
+
+def _inject_toc_parapr(header_xml: str) -> str:
+    """header.xml에 목차용 paraPr(32 제목, 33 항목)을 동적으로 추가한다.
+    paraPr 23을 복제해 32는 가운데 정렬, 33은 우측 자동탭(tabPrIDRef=2)으로 교체.
+    """
+    if '<hh:paraPr id="32"' in header_xml:   # 이미 주입됨
+        return header_xml
+    m = re.search(r'<hh:paraPr id="23".*?</hh:paraPr>', header_xml, re.DOTALL)
+    if not m:
+        return header_xml
+    base = m.group(0)
+
+    # 32: 목차 제목 — 가운데 정렬
+    title = base.replace('id="23"', f'id="{_PARA_TOC_TITLE}"', 1)
+    title = title.replace('horizontal="JUSTIFY"', 'horizontal="CENTER"', 1)
+    # 33: 목차 항목 — 우측 자동탭 (tabPrIDRef 0 → 2)
+    entry = base.replace('id="23"', f'id="{_PARA_TOC_ENTRY}"', 1)
+    entry = entry.replace('tabPrIDRef="0"', 'tabPrIDRef="2"', 1)
+
+    header_xml = header_xml.replace(
+        '</hh:paraProperties>', title + entry + '</hh:paraProperties>', 1
+    )
+    header_xml = re.sub(
+        r'(<hh:paraProperties itemCnt=")(\d+)(")',
+        lambda mm: f'{mm.group(1)}{int(mm.group(2)) + 2}{mm.group(3)}',
         header_xml, count=1,
     )
     return header_xml
@@ -348,6 +381,33 @@ def _build_image_table_xml(captions: list, table_id: int) -> str:
     return tbl
 
 
+# ── 목차 XML 생성 ──────────────────────────────────────────────────────────────
+def _build_toc_xml(entries: list) -> str:
+    """목차 XML 생성: '목 차' 제목 + 항목별 단락(섹션명 + 점선탭).
+    페이지 번호는 비워 두며 사용자가 한글에서 직접 기입한다.
+    점선탭: 우측 자동탭(_PARA_TOC_ENTRY → tabPrIDRef=2) + leader=3(점선).
+    """
+    result = _spacer(_CHAR_SP_8PT)
+    # 목차 제목
+    result += (
+        f'<hp:p id="0" paraPrIDRef="{_PARA_TOC_TITLE}" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
+        f'<hp:run charPrIDRef="{_CHAR_HEADING}"><hp:t>목  차</hp:t></hp:run>'
+        f'<hp:linesegarray/></hp:p>'
+    )
+    result += _spacer(_CHAR_SP_8PT)
+    # 목차 항목들 (섹션명 + 점선탭, 페이지 번호는 빈칸)
+    for entry in entries:
+        text = xml_escape(str(entry).strip())
+        result += _spacer(_CHAR_SP_3PT)
+        result += (
+            f'<hp:p id="0" paraPrIDRef="{_PARA_TOC_ENTRY}" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
+            f'<hp:run charPrIDRef="{_CHAR_BODY}">'
+            f'<hp:t>{text}<hp:tab leader="3" type="2"/></hp:t></hp:run>'
+            f'<hp:linesegarray/></hp:p>'
+        )
+    return result
+
+
 # ── 섹션 XML 생성 ──────────────────────────────────────────────────────────────
 def _build_section_xml(title: str, body_parts: list, tables: list, tbl_counter: list) -> str:
     """섹션 제목 + 본문 단락들 + 표들 XML 생성
@@ -398,11 +458,15 @@ def _extract_sections_from_blocks(doc_json: dict) -> dict:
 
     sections: list = []
     current: dict | None = None
+    toc_entries: list = []
 
     for block in blocks:
         btype = block.get("type")
 
-        if btype == "heading":
+        if btype == "toc":
+            toc_entries = block.get("entries", [])
+
+        elif btype == "heading":
             current = {
                 "title": block.get("text", "").strip(),
                 "body_parts": [],
@@ -423,7 +487,7 @@ def _extract_sections_from_blocks(doc_json: dict) -> dict:
         elif btype in ("table", "simple_table", "image_table") and current is not None:
             current["tables"].append(block)
 
-    return {"title": title, "sections": sections}
+    return {"title": title, "sections": sections, "toc": toc_entries}
 
 
 # ── HWPX 파일 생성 ─────────────────────────────────────────────────────────────
@@ -440,12 +504,12 @@ def render_hwpx_real(doc_json: dict) -> str:
         with zipfile.ZipFile(TEMPLATE_PATH, "r") as zf:
             zf.extractall(work_dir)
 
-        # 0. header.xml에 수준별 내어쓰기 paraPr(28~31) 주입
+        # 0. header.xml에 커스텀 paraPr 주입 (내어쓰기 28~31, 목차 32~33)
         header_path = work_dir / "Contents" / "header.xml"
-        header_path.write_text(
-            _inject_hanging_parapr(header_path.read_text(encoding="utf-8")),
-            encoding="utf-8",
-        )
+        _hdr = header_path.read_text(encoding="utf-8")
+        _hdr = _inject_hanging_parapr(_hdr)
+        _hdr = _inject_toc_parapr(_hdr)
+        header_path.write_text(_hdr, encoding="utf-8")
 
         section_path = work_dir / "Contents" / "section0.xml"
         xml_bytes = section_path.read_bytes()
@@ -464,8 +528,10 @@ def render_hwpx_real(doc_json: dict) -> str:
             flags=re.DOTALL,
         )
 
-        # 3. 섹션 XML 동적 생성
+        # 3. 섹션 XML 동적 생성 (목차 요청 시 맨 앞에 목차 삽입)
         body_xml = b""
+        if fields.get("toc"):
+            body_xml += _build_toc_xml(fields["toc"]).encode("utf-8")
         for sec in fields["sections"]:
             body_xml += _build_section_xml(
                 sec["title"], sec["body_parts"], sec["tables"], tbl_counter
