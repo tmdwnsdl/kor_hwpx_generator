@@ -20,8 +20,23 @@ _CHAR_SP_3PT = "19"   # 3pt: ○ 수준 앞
 _CHAR_SP_1PT = "20"   # 1pt: -, * 수준 앞
 
 # paraPr IDs
-_PARA_ROMAN  = "23"   # 모든 본문 단락 공통 (left=0) — 들여쓰기는 전각공백으로 처리
+_PARA_ROMAN  = "23"   # Ⅰ. 수준 / 기본 (left=0, intent=0) — 내어쓰기 없음
 _PARA_SQUARE = "24"   # 표 단락용 (left=2000, 1칸)
+
+# 수준별 내어쓰기(hanging indent) paraPr — 렌더 시점에 header.xml에 동적 주입
+# paraPr 23(left=0)을 복제하고 intent만 음수로 교체 (left=0 유지)
+# → 글머리표 항목이 줄바꿈될 때 둘째 줄부터 본문 시작점에 정렬됨
+# 값: 한글에서 Shift+Tab 적용한 파일 실측치 (수준별, left=0)
+_PARA_HANG_SQ   = "28"  # □ 수준
+_PARA_HANG_CI   = "29"  # ◦ 수준
+_PARA_HANG_DASH = "30"  # - 수준
+_PARA_HANG_STAR = "31"  # * 수준
+_HANG_INTENT = {
+    _PARA_HANG_SQ:   -5992,
+    _PARA_HANG_CI:   -7802,
+    _PARA_HANG_DASH: -7814,
+    _PARA_HANG_STAR: -7692,
+}
 
 # 일반 스페이스(U+0020) 기반 들여쓰기 — 조판부호에서 v 표시 확인 가능
 _INDENT_SPACES = {
@@ -57,21 +72,55 @@ _BF_HDR_ONLY_L     = "17"  # HDR-only, 마지막열:   T=0.3 B=0.3 fill
 
 
 def _detect_level(line: str) -> tuple:
-    """줄 첫 기호로 단락 수준 감지 → (indent_count, spacer_charPr, base_charPr)
-    indent_count: 텍스트 앞에 붙일 전각공백(　, U+3000) 개수
+    """줄 첫 기호로 단락 수준 감지
+    → (indent_str, spacer_charPr, base_charPr, para_pr_id)
+    para_pr_id: 줄바꿈 시 둘째 줄을 본문 시작점에 정렬하는 내어쓰기 paraPr
     """
     s = line.lstrip()
     if re.match(r'^[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩⅰⅱⅲⅳⅴ]', s):
-        return _INDENT_SPACES["roman"],  _CHAR_SP_8PT, _CHAR_HEADING
+        return _INDENT_SPACES["roman"],  _CHAR_SP_8PT, _CHAR_HEADING, _PARA_ROMAN
     if s.startswith(('□', 'ㅁ')):
-        return _INDENT_SPACES["square"], _CHAR_SP_5PT, _CHAR_BODY
+        return _INDENT_SPACES["square"], _CHAR_SP_5PT, _CHAR_BODY, _PARA_HANG_SQ
     if s.startswith(('◦', '○', 'ㅇ')):   # ◦ = U+25E6 (기본), ○/ㅇ 호환
-        return _INDENT_SPACES["circle"], _CHAR_SP_3PT, _CHAR_BODY
+        return _INDENT_SPACES["circle"], _CHAR_SP_3PT, _CHAR_BODY, _PARA_HANG_CI
     if s.startswith('-'):
-        return _INDENT_SPACES["dash"],   _CHAR_SP_1PT, _CHAR_BODY
+        return _INDENT_SPACES["dash"],   _CHAR_SP_1PT, _CHAR_BODY, _PARA_HANG_DASH
     if s.startswith(('*', '※')):
-        return _INDENT_SPACES["star"],   _CHAR_SP_1PT, _CHAR_REF
-    return _INDENT_SPACES["square"], _CHAR_SP_5PT, _CHAR_BODY   # 기본값 → □ 수준
+        return _INDENT_SPACES["star"],   _CHAR_SP_1PT, _CHAR_REF, _PARA_HANG_STAR
+    return _INDENT_SPACES["square"], _CHAR_SP_5PT, _CHAR_BODY, _PARA_HANG_SQ   # 기본값 → □ 수준
+
+
+def _inject_hanging_parapr(header_xml: str) -> str:
+    """header.xml에 수준별 내어쓰기 paraPr(28~31)을 동적으로 추가한다.
+    paraPr 23(left=0)을 복제해 intent만 음수로 교체 → 템플릿 영구 수정 없이 렌더 시점 주입.
+    """
+    if '<hh:paraPr id="28"' in header_xml:   # 이미 주입됨
+        return header_xml
+    m = re.search(r'<hh:paraPr id="23".*?</hh:paraPr>', header_xml, re.DOTALL)
+    if not m:
+        return header_xml
+    base = m.group(0)
+
+    new_blocks = ""
+    for pid, intent in _HANG_INTENT.items():
+        blk = base.replace('id="23"', f'id="{pid}"', 1)
+        blk = re.sub(
+            r'<hc:intent value="-?\d+" unit="HWPUNIT"/>',
+            f'<hc:intent value="{intent}" unit="HWPUNIT"/>',
+            blk, count=1,
+        )
+        new_blocks += blk
+
+    header_xml = header_xml.replace(
+        '</hh:paraProperties>', new_blocks + '</hh:paraProperties>', 1
+    )
+    # itemCnt 갱신 (추가한 paraPr 개수만큼)
+    header_xml = re.sub(
+        r'(<hh:paraProperties itemCnt=")(\d+)(")',
+        lambda mm: f'{mm.group(1)}{int(mm.group(2)) + len(_HANG_INTENT)}{mm.group(3)}',
+        header_xml, count=1,
+    )
+    return header_xml
 
 
 def _spacer(char_pr: str) -> str:
@@ -244,17 +293,17 @@ def _build_section_xml(title: str, body_parts: list, tables: list, tbl_counter: 
         f'<hp:linesegarray/></hp:p>'
     )
 
-    # ② 본문 단락들 — 기호 감지 → 빈줄 삽입 + 전각공백 prefix + charPr
+    # ② 본문 단락들 — 기호 감지 → 빈줄 삽입 + space prefix + charPr + 내어쓰기 paraPr
     for body_text in body_parts:
         for line in body_text.split("\n"):
             if not line.strip():
                 continue
-            indent_cnt, spacer_cpr, base_char = _detect_level(line)
-            indented = indent_cnt + line.lstrip()
+            indent_str, spacer_cpr, base_char, para_pr = _detect_level(line)
+            indented = indent_str + line.lstrip()
             runs = _runs_from_text(indented, base_char)
             result += _spacer(spacer_cpr)
             result += (
-                f'<hp:p id="0" paraPrIDRef="{_PARA_ROMAN}" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
+                f'<hp:p id="0" paraPrIDRef="{para_pr}" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
                 f'{runs}'
                 f'<hp:linesegarray/></hp:p>'
             )
@@ -316,6 +365,13 @@ def render_hwpx_real(doc_json: dict) -> str:
         work_dir.mkdir(parents=True, exist_ok=True)
         with zipfile.ZipFile(TEMPLATE_PATH, "r") as zf:
             zf.extractall(work_dir)
+
+        # 0. header.xml에 수준별 내어쓰기 paraPr(28~31) 주입
+        header_path = work_dir / "Contents" / "header.xml"
+        header_path.write_text(
+            _inject_hanging_parapr(header_path.read_text(encoding="utf-8")),
+            encoding="utf-8",
+        )
 
         section_path = work_dir / "Contents" / "section0.xml"
         xml_bytes = section_path.read_bytes()
