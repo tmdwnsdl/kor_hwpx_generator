@@ -152,6 +152,7 @@ OUTPUT_DIR = BASE_DIR / "storage" / "hwpx"
 # → ㅁ 수준(1칸) 들여쓰기 시작점에서 우측 여백까지 꽉 채움
 _TABLE_WIDTH  = 43922
 _CELL_HEIGHT  = 1800
+_IMG_CELL_HEIGHT = 5790  # 그림표 그림칸 높이 (그림 표.hwpx 실측)
 _COL_MIN_WIDTH = 2000   # 최소 열 너비 (열이 많아도 찌그러지지 않게 최소 보장)
 
 
@@ -277,6 +278,76 @@ def _build_table_xml(headers: list, rows: list, table_id: int) -> str:
     return tbl
 
 
+# ── 그림표 XML 생성 ────────────────────────────────────────────────────────────
+def _build_image_table_xml(captions: list, table_id: int) -> str:
+    """그림을 넣을 수 있는 표 XML 생성.
+    1행: 빈 그림칸(사용자가 한글에서 직접 그림 삽입), 2행: 캡션 텍스트.
+    captions 길이 = 열 개수.
+    """
+    col_count = max(len(captions), 1)
+    row_count = 2
+
+    # 열 너비 균등 분배 (나머지는 마지막 열에)
+    base_w = _TABLE_WIDTH // col_count
+    col_widths = [base_w] * col_count
+    col_widths[-1] += _TABLE_WIDTH - base_w * col_count
+
+    total_h = _IMG_CELL_HEIGHT + _CELL_HEIGHT
+
+    def bf(ci: int) -> str:
+        """모든 칸 균일한 얇은 테두리 (중간 데이터행 borderFill 재사용)"""
+        return _BF_MID_L if ci == col_count - 1 else _BF_MID_NL
+
+    def cell(ci: int, row: int, height: int, runs: str) -> str:
+        return (
+            f'<hp:tc name="" header="0" hasMargin="0" protect="0" editable="0" dirty="0" borderFillIDRef="{bf(ci)}">'
+            f'<hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="CENTER" '
+            f'linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">'
+            f'<hp:p id="0" paraPrIDRef="1" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
+            f'{runs}'
+            f'<hp:linesegarray/></hp:p></hp:subList>'
+            f'<hp:cellAddr colAddr="{ci}" rowAddr="{row}"/>'
+            f'<hp:cellSpan colSpan="1" rowSpan="1"/>'
+            f'<hp:cellSz width="{col_widths[ci]}" height="{height}"/>'
+            f'<hp:cellMargin left="140" right="140" top="140" bottom="140"/></hp:tc>'
+        )
+
+    tbl = (
+        f'<hp:p id="0" paraPrIDRef="{_PARA_SQUARE}" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
+        f'<hp:run charPrIDRef="{_CHAR_TABLE_BODY}">'
+        f'<hp:tbl id="{table_id}" zOrder="0" numberingType="TABLE" textWrap="TOP_AND_BOTTOM" '
+        f'textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" pageBreak="CELL" repeatHeader="1" '
+        f'rowCnt="{row_count}" colCnt="{col_count}" cellSpacing="0" borderFillIDRef="{_BF_TABLE_FRAME}" noAdjust="0">'
+        f'<hp:sz width="{_TABLE_WIDTH}" widthRelTo="ABSOLUTE" '
+        f'height="{total_h}" heightRelTo="ABSOLUTE" protect="0"/>'
+        f'<hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="0" '
+        f'holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" '
+        f'horzAlign="LEFT" vertOffset="0" horzOffset="0"/>'
+        f'<hp:outMargin left="283" right="283" top="283" bottom="283"/>'
+        f'<hp:inMargin left="565" right="565" top="0" bottom="0"/>'
+    )
+
+    # 1행: 빈 그림칸
+    tbl += '<hp:tr>'
+    for ci in range(col_count):
+        tbl += cell(ci, 0, _IMG_CELL_HEIGHT, f'<hp:run charPrIDRef="{_CHAR_TABLE_BODY}"/>')
+    tbl += '</hp:tr>'
+
+    # 2행: 캡션
+    tbl += '<hp:tr>'
+    for ci in range(col_count):
+        cap = str(captions[ci]).strip() if ci < len(captions) else ""
+        run = (
+            f'<hp:run charPrIDRef="{_CHAR_TABLE_BODY}"><hp:t>{xml_escape(cap)}</hp:t></hp:run>'
+            if cap else f'<hp:run charPrIDRef="{_CHAR_TABLE_BODY}"/>'
+        )
+        tbl += cell(ci, 1, _CELL_HEIGHT, run)
+    tbl += '</hp:tr>'
+
+    tbl += '</hp:tbl><hp:t/></hp:run><hp:linesegarray/></hp:p>'
+    return tbl
+
+
 # ── 섹션 XML 생성 ──────────────────────────────────────────────────────────────
 def _build_section_xml(title: str, body_parts: list, tables: list, tbl_counter: list) -> str:
     """섹션 제목 + 본문 단락들 + 표들 XML 생성
@@ -312,7 +383,10 @@ def _build_section_xml(title: str, body_parts: list, tables: list, tbl_counter: 
     for tbl in tables:
         tbl_counter[0] += 1
         result += _spacer(_CHAR_SP_5PT)
-        result += _build_table_xml(tbl.get("headers", []), tbl.get("rows", []), tbl_counter[0])
+        if tbl.get("type") == "image_table":
+            result += _build_image_table_xml(tbl.get("captions", []), tbl_counter[0])
+        else:
+            result += _build_table_xml(tbl.get("headers", []), tbl.get("rows", []), tbl_counter[0])
 
     return result
 
@@ -346,7 +420,7 @@ def _extract_sections_from_blocks(doc_json: dict) -> dict:
             if items:
                 current["body_parts"].append("\n".join(items))
 
-        elif btype in ("table", "simple_table") and current is not None:
+        elif btype in ("table", "simple_table", "image_table") and current is not None:
             current["tables"].append(block)
 
     return {"title": title, "sections": sections}

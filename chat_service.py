@@ -153,6 +153,13 @@ def _doc_to_blocks_json(doc: ReportDocument) -> dict:
                         "rows": block.get("rows", []),
                     }
                 )
+            elif btype == "image_table":
+                blocks.append(
+                    {
+                        "type": "image_table",
+                        "captions": block.get("captions", []),
+                    }
+                )
     return {"title": doc.title, "blocks": blocks}
 
 
@@ -245,6 +252,39 @@ TOOLS: List[dict] = [
                     },
                 },
                 "required": ["document_id", "section_key", "headers", "rows"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "add_image_table",
+            "description": (
+                "특정 섹션에 그림(사진)을 넣을 수 있는 표를 추가합니다. "
+                "윗줄은 그림을 넣을 빈 칸, 아랫줄은 각 그림의 캡션입니다. "
+                "captions 목록의 길이가 표의 열(그림) 개수가 됩니다. "
+                "그림 파일 자체는 사용자가 한글에서 직접 삽입하므로, 빈 칸 표 구조만 생성합니다."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "document_id": {"type": "string"},
+                    "section_key": {
+                        "type": "string",
+                        "description": "create_report_draft에서 지정한 섹션 key값",
+                    },
+                    "captions": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": (
+                            "각 그림 칸 아래에 들어갈 캡션 목록. "
+                            "목록 길이 = 표의 열 개수. "
+                            "캡션이 필요 없는 칸은 빈 문자열(\"\")로 두세요. "
+                            "예: ['어린이 안전일기장', '안전체험교실', '안전 골든벨']"
+                        ),
+                    },
+                },
+                "required": ["document_id", "section_key", "captions"],
             },
         },
     },
@@ -369,6 +409,28 @@ def _execute_tool(name: str, inputs: dict) -> dict:
                 "updated_at": doc.updated_at,
             }
 
+        elif name == "add_image_table":
+            doc = store.get(inputs["document_id"])
+            section = next(
+                (s for s in doc.sections if s.key == inputs["section_key"]), None
+            )
+            if section is None:
+                return {"error": f"section_key '{inputs['section_key']}' not found"}
+            captions = inputs["captions"]
+            section.blocks.append(
+                {
+                    "type": "image_table",
+                    "captions": captions,
+                }
+            )
+            store.save(doc)
+            return {
+                "document_id": inputs["document_id"],
+                "section_key": inputs["section_key"],
+                "column_count": len(captions),
+                "updated_at": doc.updated_at,
+            }
+
         elif name == "update_table":
             doc = store.get(inputs["document_id"])
             section = next(
@@ -450,6 +512,8 @@ STEP 3. 사용자 선택 확인 후 create_report_draft 호출
 STEP 4. 각 섹션 내용 작성
   - 각 섹션 내용을 set_section_text로 입력
   - 표가 필요하면 add_simple_table 호출
+  - 그림(사진)을 넣을 자리가 필요하면 add_image_table 호출
+    (그림 파일은 사용자가 한글에서 직접 삽입하므로 빈 그림칸 + 캡션 표만 생성)
   - 사용자가 제공한 정보를 최우선으로 반영
   - 부족한 정보는 사용자에게 질문하여 보완
 

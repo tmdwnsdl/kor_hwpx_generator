@@ -131,6 +131,28 @@ def render_html(doc_json: dict) -> str:
     .doc-table td:not(:first-child) { border-left: 0.12mm solid #000; }
     /* 마지막 행 하단 0.3mm */
     .doc-table tr:last-child td { border-bottom: 0.3mm solid #000; }
+
+    /* 그림표 — 윗줄: 그림 넣을 빈 칸, 아랫줄: 캡션 */
+    .img-table {
+      border-collapse: collapse;
+      margin-left: 1ch;
+      width: calc(100% - 1ch);
+      font-size: 12pt;
+      font-family: 'Malgun Gothic', '맑은고딕', sans-serif;
+      table-layout: fixed;
+    }
+    .img-table td {
+      border: 0.12mm solid #000;
+      text-align: center;
+      vertical-align: middle;
+    }
+    .img-table .img-cell {
+      height: 120px;
+      color: #bbb;
+      font-size: 13px;
+      background: #fafafa;
+    }
+    .img-table .img-cap { padding: 6px 8px; }
   </style>
 </head>
 <body>
@@ -186,6 +208,19 @@ def render_html(doc_json: dict) -> str:
                 parts.append('    </tr>\n')
             parts.append('    </tbody>\n')
             parts.append('  </table>\n')
+
+        elif btype == "image_table":
+            captions = block.get("captions", [])
+            n = max(len(captions), 1)
+            parts.append('  <table class="img-table" style="margin-top:5pt;">\n')
+            parts.append('    <tr>\n')
+            for _ in range(n):
+                parts.append('      <td class="img-cell">그림</td>\n')
+            parts.append('    </tr>\n    <tr>\n')
+            for i in range(n):
+                cap = escape(str(captions[i])) if i < len(captions) else ""
+                parts.append(f'      <td class="img-cap">{cap}</td>\n')
+            parts.append('    </tr>\n  </table>\n')
 
     parts.append("</div>\n</body>\n</html>")
     return "".join(parts)
